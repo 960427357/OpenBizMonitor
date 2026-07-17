@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置 - 网吧监控系统</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px;}
+        .container {background: white; border-radius: 20px; padding: 30px; max-width: 1000px; margin: 0 auto;}
+        .form-section {border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; margin-bottom: 20px;}
+        .section-title {font-size: 1.2rem; font-weight: 600; color: #6366f1; margin-bottom: 15px;}
+        
+        .region-selector {border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;}
+        .region-panels {display: flex; height: 400px;}
+        .region-panel {flex: 1; border-right: 1px solid #e5e7eb; overflow-y: auto; background: #f9fafb;}
+        .region-panel:last-child {border-right: none;}
+        .region-panel-header {padding: 12px 15px; background: #6366f1; color: white; font-weight: 600; position: sticky; top: 0; z-index: 10;}
+        .region-list {list-style: none; padding: 5px 0; margin: 0;}
+        .region-item {padding: 8px 15px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px;}
+        .region-item:hover {background: #e0e7ff;}
+        .region-item.active {background: #c7d2fe; font-weight: 600;}
+        .region-item input[type="checkbox"] {width: 16px; height: 16px; cursor: pointer; accent-color: #6366f1;}
+        .region-placeholder {padding: 12px 15px; color: #6b7280; font-size: 0.9rem; text-align: center;}
+        
+        .selected-regions {display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;}
+        .region-tag {background: #e0e7ff; color: #4f46e5; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; display: flex; align-items: center; gap: 5px;}
+        .region-tag button {background: none; border: none; cursor: pointer; color: #6366f1; font-size: 1rem; padding: 0; line-height: 1;}
+        .region-tag button:hover {color: #dc2626;}
+        .region-actions {display: flex; gap: 10px; margin-bottom: 10px;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h3 class="mb-4">⚙️ 系统设置</h3>
+        <a href="/" class="btn btn-outline-secondary mb-3">← 返回</a>
+
+        <div class="form-section">
+            <div class="section-title">🎯 监控地区选择</div>
+            <p class="text-muted mb-3">点击省份 → 选择城市 → 选择区县，勾选框可多选</p>
+            
+            <div class="region-selector">
+                <div class="region-panels">
+                    <div class="region-panel">
+                        <div class="region-panel-header">省/自治区/直辖市</div>
+                        <ul class="region-list" id="provinceList"></ul>
+                    </div>
+                    <div class="region-panel">
+                        <div class="region-panel-header" id="cityHeader">请先选择省份</div>
+                        <div class="region-placeholder" id="cityPlaceholder">← 点击左侧省份</div>
+                        <ul class="region-list" id="cityList" style="display:none;"></ul>
+                    </div>
+                    <div class="region-panel">
+                        <div class="region-panel-header" id="countyHeader">请先选择城市</div>
+                        <div class="region-placeholder" id="countyPlaceholder">← 点击中间城市</div>
+                        <ul class="region-list" id="countyList" style="display:none;"></ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <label class="form-label"><strong>已选地区：</strong><span class="text-muted" id="selectedCount">0个</span></label>
+                <div class="region-actions">
+                    <button class="btn btn-sm btn-outline-danger" onclick="clearAllRegions()">清空所有</button>
+                </div>
+                <div class="selected-regions" id="selectedRegions"></div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">🔍 搜索配置</div>
+            <div class="mb-3">
+                <label class="form-label">搜索关键词（逗号分隔）</label>
+                <input type="text" class="form-control" id="keywords" value="网吧, 网咖, 电竞">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">排除关键词（逗号分隔）</label>
+                <input type="text" class="form-control" id="exclude_keywords" value="">
+                <small class="text-muted">包含这些关键词的企业会被自动跳过</small>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">搜索时间范围</label>
+                <select class="form-select" id="searchTimeRange">
+                    <option value="1">最近1年（推荐）</option>
+                    <option value="2">最近2年</option>
+                    <option value="3">最近3年</option>
+                    <option value="5">最近5年</option>
+                    <option value="0">不限时间</option>
+                </select>
+                <small class="text-muted">超过此时限的企业不显示</small>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">🔑 天眼查API</div>
+            <div class="mb-3">
+                <label class="form-label">API Key <span class="text-danger">*</span></label>
+                <input type="password" class="form-control" id="api_key" value="">
+                <small class="text-muted"><a href="https://open.tianyancha.com/" target="_blank">点击获取API Key</a></small>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <div class="section-title">⚙️ 系统配置</div>
+            <div class="mb-3">
+                <label class="form-label">Web端口</label>
+                <input type="number" class="form-control" id="port" value="8080">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">系统标题</label>
+                <input type="text" class="form-control" id="title" value="网吧监控系统">
+            </div>
+        </div>
+
+        <button class="btn btn-primary btn-lg w-100" onclick="saveConfig()">💾 保存配置</button>
+    </div>
+
+    <script src="/static/region-data.js"></script>
+    <script>
+    let selectedRegions = [];
+    let currentProvince = null;
+    let currentCity = null;
+
+    function init() {
+        renderProvinces();
+        loadConfig();
+    }
+
+    // 渲染省份列表（带复选框）
+    function renderProvinces() {
+        const list = document.getElementById('provinceList');
+        list.innerHTML = '';
+        for (const province in regionData) {
+            const li = document.createElement('li');
+            li.className = 'region-item';
+            li.innerHTML = '<input type="checkbox" onchange="toggleProvince(this, \'' + province + '\')"><span onclick="selectProvince(\'' + province + '\', this.parentElement)">' + province + '</span>';
+            list.appendChild(li);
+        }
+    }
+
+    // 省份复选框：全选/取消该省所有市县
+    function toggleProvince(checkbox, province) {
+        const cities = regionData[province];
+        if (checkbox.checked) {
+            // 全选该省所有市县
+            for (const city in cities) {
+                for (const county of cities[city]) {
+                    const regionName = province + '-' + city + '-' + county;
+                    if (!selectedRegions.includes(regionName)) {
+                        selectedRegions.push(regionName);
+                    }
+                }
+            }
+        } else {
+            // 取消该省所有市县
+            selectedRegions = selectedRegions.filter(r => !r.startsWith(province + '-'));
+        }
+        renderSelectedRegions();
+    }
+
+    // 点击省份名称：展开城市列表
+    function selectProvince(province, li) {
+        currentProvince = province;
+        currentCity = null;
+        document.querySelectorAll('#provinceList .region-item').forEach(el => el.classList.remove('active'));
+        li.classList.add('active');
+        
+        const cities = regionData[province];
+        document.getElementById('cityHeader').textContent = province;
+        document.getElementById('cityPlaceholder').style.display = 'none';
+        const cityList = document.getElementById('cityList');
+        cityList.style.display = 'block';
+        cityList.innerHTML = '';
+        
+        for (const city in cities) {
+            const li = document.createElement('li');
+            li.className = 'region-item';
+            const isChecked = isCityFullySelected(province, city) ? 'checked' : '';
+            li.innerHTML = '<input type="checkbox" ' + isChecked + ' onchange="toggleCity(this, \'' + province + '\', \'' + city + '\')"><span onclick="selectCity(\'' + province + '\', \'' + city + '\', this.parentElement)">' + city + '</span>';
+            cityList.appendChild(li);
+        }
+        
+        document.getElementById('countyHeader').textContent = '请先选择城市';
+        document.getElementById('countyPlaceholder').style.display = 'block';
+        document.getElementById('countyList').style.display = 'none';
+    }
+
+    // 城市复选框：全选/取消该市所有区县
+    function toggleCity(checkbox, province, city) {
+        const counties = regionData[province][city];
+        if (checkbox.checked) {
+            // 全选该市所有区县
+            for (const county of counties) {
+                const regionName = province + '-' + city + '-' + county;
+                if (!selectedRegions.includes(regionName)) {
+                    selectedRegions.push(regionName);
+                }
+            }
+        } else {
+            // 取消该市所有区县
+            selectedRegions = selectedRegions.filter(r => r !== province + '-' + city + '-' + r.split('-')[2]);
+            selectedRegions = selectedRegions.filter(r => !(r.startsWith(province + '-' + city + '-')));
+        }
+        renderSelectedRegions();
+        // 更新省份复选框状态
+        updateProvinceCheckbox(province);
+    }
+
+    // 点击城市名称：展开区县列表
+    function selectCity(province, city, li) {
+        currentCity = city;
+        document.querySelectorAll('#cityList .region-item').forEach(el => el.classList.remove('active'));
+        li.classList.add('active');
+        
+        const counties = regionData[province][city];
+        document.getElementById('countyHeader').textContent = city;
+        document.getElementById('countyPlaceholder').style.display = 'none';
+        const countyList = document.getElementById('countyList');
+        countyList.style.display = 'block';
+        countyList.innerHTML = '';
+        
+        for (const county of counties) {
+            const li = document.createElement('li');
+            li.className = 'region-item';
+            const regionName = province + '-' + city + '-' + county;
+            const isChecked = selectedRegions.includes(regionName) ? 'checked' : '';
+            li.innerHTML = '<input type="checkbox" ' + isChecked + ' onchange="toggleCounty(this, \'' + province + '\', \'' + city + '\', \'' + county + '\')"><span>' + county + '</span>';
+            countyList.appendChild(li);
+        }
+    }
+
+    // 区县复选框：添加/移除单个区县
+    function toggleCounty(checkbox, province, city, county) {
+        const regionName = province + '-' + city + '-' + county;
+        if (checkbox.checked) {
+            if (!selectedRegions.includes(regionName)) {
+                selectedRegions.push(regionName);
+            }
+        } else {
+            selectedRegions = selectedRegions.filter(r => r !== regionName);
+        }
+        renderSelectedRegions();
+        // 更新城市和省份复选框状态
+        updateCityCheckbox(province, city);
+        updateProvinceCheckbox(province);
+    }
+
+    // 判断城市是否全选
+    function isCityFullySelected(province, city) {
+        const counties = regionData[province][city];
+        return counties.every(county => selectedRegions.includes(province + '-' + city + '-' + county));
+    }
+
+    // 判断省份是否全选
+    function isProvinceFullySelected(province) {
+        const cities = regionData[province];
+        for (const city in cities) {
+            if (!isCityFullySelected(province, city)) return false;
+        }
+        return true;
+    }
+
+    // 更新城市复选框状态
+    function updateCityCheckbox(province, city) {
+        const cityList = document.getElementById('cityList');
+        const items = cityList.querySelectorAll('.region-item');
+        items.forEach(item => {
+            const span = item.querySelector('span');
+            if (span && span.textContent === city) {
+                const cb = item.querySelector('input[type="checkbox"]');
+                cb.checked = isCityFullySelected(province, city);
+            }
+        });
+    }
+
+    // 更新省份复选框状态
+    function updateProvinceCheckbox(province) {
+        const provinceList = document.getElementById('provinceList');
+        const items = provinceList.querySelectorAll('.region-item');
+        items.forEach(item => {
+            const span = item.querySelector('span');
+            if (span && span.textContent === province) {
+                const cb = item.querySelector('input[type="checkbox"]');
+                cb.checked = isProvinceFullySelected(province);
+            }
+        });
+    }
+
+    function renderSelectedRegions() {
+        const container = document.getElementById('selectedRegions');
+        container.innerHTML = '';
+        
+        selectedRegions.forEach((region, index) => {
+            const tag = document.createElement('span');
+            tag.className = 'region-tag';
+            tag.innerHTML = region + ' <button onclick="removeRegion(' + index + ')">×</button>';
+            container.appendChild(tag);
+        });
+        
+        document.getElementById('selectedCount').textContent = selectedRegions.length + '个';
+    }
+
+    function removeRegion(index) {
+        const region = selectedRegions[index];
+        selectedRegions.splice(index, 1);
+        renderSelectedRegions();
+        // 更新复选框状态
+        const parts = region.split('-');
+        if (parts.length >= 2) {
+            updateCityCheckbox(parts[0], parts[1]);
+            updateProvinceCheckbox(parts[0]);
+        }
+    }
+
+    function clearAllRegions() {
+        selectedRegions = [];
+        renderSelectedRegions();
+        // 清除所有复选框
+        document.querySelectorAll('.region-item input[type="checkbox"]').forEach(cb => cb.checked = false);
+    }
+
+    function loadConfig() {
+        fetch('/api/config')
+            .then(r => r.json())
+            .then(config => {
+                if (config.tianyancha && config.tianyancha.api_key) {
+                    document.getElementById('api_key').value = config.tianyancha.api_key;
+                }
+                if (config.monitor) {
+                    document.getElementById('keywords').value = (config.monitor.keywords || []).join(', ');
+                    document.getElementById('exclude_keywords').value = (config.monitor.exclude_keywords || []).join(', ');
+                    if (config.monitor.time_range) {
+                        document.getElementById('searchTimeRange').value = config.monitor.time_range;
+                    }
+                }
+                if (config.web) {
+                    document.getElementById('port').value = config.web.port || 8080;
+                    document.getElementById('title').value = config.web.title || '网吧监控系统';
+                }
+                if (config.monitor && config.monitor.regions) {
+                    selectedRegions = config.monitor.regions;
+                    renderSelectedRegions();
+                    // 恢复复选框状态
+                    restoreCheckboxes();
+                }
+            })
+            .catch(e => console.error('加载配置失败:', e));
+    }
+
+    // 恢复复选框状态
+    function restoreCheckboxes() {
+        // 遍历所有省份
+        for (const province in regionData) {
+            if (isProvinceFullySelected(province)) {
+                // 标记省份复选框
+                const provinceList = document.getElementById('provinceList');
+                provinceList.querySelectorAll('.region-item').forEach(item => {
+                    if (item.querySelector('span') && item.querySelector('span').textContent === province) {
+                        item.querySelector('input[type="checkbox"]').checked = true;
+                    }
+                });
+            }
+        }
+    }
+
+    function saveConfig() {
+        const config = {
+            tianyancha: {
+                api_url: "https://mcp.tianyancha.com/v1",
+                api_key: document.getElementById('api_key').value
+            },
+            monitor: {
+                regions: selectedRegions,
+                keywords: document.getElementById('keywords').value.split(',').map(s => s.trim()).filter(s => s),
+                exclude_keywords: document.getElementById('exclude_keywords').value.split(',').map(s => s.trim()).filter(s => s),
+                time_range: parseInt(document.getElementById('searchTimeRange').value) || 1
+            },
+            web: {
+                port: parseInt(document.getElementById('port').value) || 8080,
+                title: document.getElementById('title').value
+            }
+        };
+
+        fetch('/api/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(config)
+        })
+        .then(r => r.json())
+        .then(result => {
+            if(result.success) {
+                alert('✅ 配置保存成功！\n\n需要重启服务才能生效。');
+            } else {
+                alert('❌ 保存失败: ' + (result.message || '未知错误'));
+            }
+        })
+        .catch(e => alert('❌ 网络错误: ' + e.message));
+    }
+
+    init();
+    </script>
+</body>
+</html>

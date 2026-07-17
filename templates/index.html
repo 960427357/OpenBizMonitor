@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ config.web.title }}</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {--primary: #6366f1;}
+        body {background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; font-family: system-ui, -apple-system, sans-serif;}
+        .main-container {background: rgba(255,255,255,0.95); border-radius: 20px; margin: 20px auto; max-width: 1400px;}
+        .header {background: linear-gradient(135deg, var(--primary), #8b5cf6); color: white; padding: 25px; border-radius: 20px 20px 0 0; text-align: center;}
+        .card {background: white; border-radius: 15px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);}
+        .stats-number {font-size: 2rem; font-weight: 700; color: var(--primary);}
+        .status-badge {padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500;}
+        .status-pending {background: linear-gradient(135deg, #ff6b6b, #ee5a24); color: white; animation: pulse 2s infinite;}
+        @keyframes pulse {0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+        .status-excluded {background: #e5e7eb; color: #6b7280; text-decoration: line-through;}
+        .action-btn {padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; margin: 2px; border: none; cursor: pointer;}
+        .btn-edit {background: var(--primary); color: white;}
+        .btn-delete {background: #ef4444; color: white;}
+        .btn-exclude {background: #6b7280; color: white;}
+        .btn-view {background: #10b981; color: white;}
+        .table {background: white;}
+        .table thead th {background: linear-gradient(135deg, var(--primary), #8b5cf6); color: white; border: none;}
+    </style>
+</head>
+<body>
+    <div class="container p-4">
+        <div class="main-container">
+            <div class="header">
+                <h3>🎮 {{ config.web.title }}</h3>
+                <small class="text-white-70">企业总数: {{ stats.total }} | 数据库: {{ stats.recent[0].last_updated if stats.recent else '—' }}</small>
+                <div class="mt-2">
+                    <a href="/" class="btn btn-light btn-sm">📊 数据列表</a>
+                    <a href="/monitor" class="btn btn-light btn-sm">🔍 开始监控</a>
+                    <a href="/settings" class="btn btn-light btn-sm">⚙️ 设置</a>
+                </div>
+            </div>
+
+            <div class="row p-3">
+                <div class="col-md-3"><div class="card text-center"><div class="stats-number">{{ stats.total }}</div><div>企业总数</div></div></div>
+                <div class="col-md-3"><div class="card text-center"><div class="stats-number">{{ stats.by_status.get('筹建审批中', 0) }}</div><div>筹建审批中</div></div></div>
+                <div class="col-md-3"><div class="card text-center"><div class="stats-number">{{ stats.by_status.get('已正常营业', 0) }}</div><div>已正常营业</div></div></div>
+                <div class="col-md-3"><div class="card text-center"><div class="stats-number">{{ stats.by_area|length }}</div><div>覆盖区域</div></div></div>
+            </div>
+
+            <div class="p-3">
+                <div class="card">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">📋 企业列表</h5>
+                        <div>
+                            <button class="btn btn-danger btn-sm" onclick="clearAllData()">🗑️ 清除所有数据</button>
+                            <button class="btn btn-success btn-sm" onclick="exportData()">📥 导出</button>
+                        </div>
+                    </div>
+                    <div class="input-group mb-3">
+                        <input type="text" id="searchInput" class="form-control" placeholder="搜索企业名称、地址、法人...">
+                        <button class="btn btn-primary" onclick="searchRecords()">🔍 搜索</button>
+                        <button class="btn btn-secondary" onclick="resetFilters()">🔄 重置</button>
+                    </div>
+                    <!-- 筛选器 -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small">🌍 区域</label>
+                            <select id="filterArea" class="form-select form-select-sm">
+                                <option value="">全部区域</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">📊 状态</label>
+                            <select id="filterStatus" class="form-select form-select-sm">
+                                <option value="">全部状态</option>
+                                <option value="筹建审批中">筹建审批中</option>
+                                <option value="已正常营业">已正常营业</option>
+                                <option value="已排除">已排除</option>
+                                <option value="已关闭">已关闭</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">📅 成立时间</label>
+                            <select id="filterTime" class="form-select form-select-sm">
+                                <option value="">全部时间</option>
+                                <option value="365">最近1年</option>
+                                <option value="730">最近2年</option>
+                                <option value="1095">最近3年</option>
+                                <option value="1825">最近5年</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-hover">
+                            <thead><tr><th>ID</th><th>企业名称</th><th>区域</th><th>法人</th><th>资本</th><th>成立日期</th><th>状态</th><th>操作</th></tr></thead>
+                            <tbody id="recordsTable">
+                                {% for record in records %}
+                                <tr data-id="{{ record.id }}">
+                                    <td>{{ record.id }}</td>
+                                    <td><strong>{{ record.name }}</strong><br><small>{{ record.address[:30] }}...</small></td>
+                                    <td>{{ record.area.split('-')[-1] if '-' in record.area else record.area }}</td>
+                                    <td>{{ record.legal_person or '—' }}</td>
+                                    <td>{{ record.registered_capital or '—' }}</td>
+                                    <td>{{ record.establish_date or '—' }}</td>
+                                    <td><span class="status-badge status-{{ record.status|lower|replace(' ', '-') }}">{{ record.status }}</span></td>
+                                    <td>
+                                        <button class="action-btn btn-view" onclick="viewRecord('{{ record.id }}')">👁️</button>
+                                        <button class="action-btn btn-edit" onclick="editRecord('{{ record.id }}')">✏️</button>
+                                        <button class="action-btn btn-delete" onclick="deleteRecord('{{ record.id }}')">🗑️</button>
+                                        <button class="action-btn btn-exclude" onclick="excludeRecord('{{ record.id }}')">❌</button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="viewModal" tabindex="-1">
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">企业详情</h5><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body" id="viewModalBody"></div>
+        </div></div>
+    </div>
+
+    <!-- 编辑模态框 -->
+    <div class="modal fade" id="editModal" tabindex="-1">
+        <div class="modal-dialog modal-lg"><div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white;">
+                <h5 class="modal-title">编辑企业信息</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    <input type="hidden" id="editId">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">企业名称 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="editName" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">区域</label>
+                            <input type="text" class="form-control" id="editArea" placeholder="如: 青海省-玉树州-杂多县">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">地址</label>
+                        <input type="text" class="form-control" id="editAddress">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">法人</label>
+                            <input type="text" class="form-control" id="editLegalPerson">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">注册资本</label>
+                            <input type="text" class="form-control" id="editRegCapital">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">成立日期</label>
+                            <input type="date" class="form-control" id="editEstablishDate">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">状态</label>
+                            <select class="form-select" id="editStatus">
+                                <option value="已正常营业">已正常营业</option>
+                                <option value="筹建审批中">筹建审批中</option>
+                                <option value="已注销">已注销</option>
+                                <option value="已排除">已排除</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">来源</label>
+                            <input type="text" class="form-control" id="editSource">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">来源链接</label>
+                        <input type="url" class="form-control" id="editSourceUrl">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        <textarea class="form-control" id="editNotes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button class="btn btn-primary" onclick="saveRecord()">💾 保存</button>
+            </div>
+        </div></div>
+    </div>
+
+    <script src="/static/bootstrap.bundle.min.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

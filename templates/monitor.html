@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>监控 - {{ config.web.title }}</title>
+    <link href="/static/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px;}
+        .container {background: white; border-radius: 20px; padding: 30px; max-width: 800px; margin: 0 auto;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h3 class="mb-4">🔍 数据监控</h3>
+        <a href="/" class="btn btn-outline-secondary mb-3">← 返回</a>
+
+        {% if not config.tianyancha.api_key %}
+        <div class="alert alert-warning">
+            ⚠️ <strong>未配置天眼查API Key！</strong>
+            <br>请先访问 <a href="/settings">设置页面</a> 配置API Key。
+        </div>
+        {% endif %}
+
+        <div class="card mb-3">
+            <h5 class="card-header">📊 当前配置</h5>
+            <div class="card-body">
+                <p><strong>监控地区:</strong> 
+                    {% if config.monitor.regions %}
+                        {{ config.monitor.regions|join(', ') }}
+                    {% else %}
+                        未配置（请先<a href="/settings">设置监控地区</a>）
+                    {% endif %}
+                </p>
+                <p><strong>搜索关键词:</strong> {{ config.monitor.keywords|join(', ') }}</p>
+                <p><strong>排除关键词:</strong> {{ config.monitor.exclude_keywords|join(', ') or '无' }}</p>
+                <p><strong>搜索时间:</strong> 最近{{ config.monitor.get('time_range', 1) }}年</p>
+                <p><strong>API状态:</strong> {{ '✅ 已配置' if config.tianyancha.api_key else '❌ 未配置' }}</p>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <h5 class="card-header">🚀 开始监控</h5>
+            <div class="card-body">
+                <p class="text-muted">点击下方按钮开始搜索天眼查，查找新开业的网吧企业。</p>
+                <button class="btn btn-primary btn-lg w-100" onclick="startMonitor()" id="startBtn">
+                    🔍 开始监控
+                </button>
+            </div>
+        </div>
+
+        <div class="card" id="resultCard" style="display: none;">
+            <h5 class="card-header">📋 监控结果</h5>
+            <div class="card-body">
+                <pre id="resultOutput" style="background: #f8f9fa; padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: auto;"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/bootstrap.bundle.min.js"></script>
+    <script>
+    function startMonitor() {
+        const btn = document.getElementById('startBtn');
+        const resultCard = document.getElementById('resultCard');
+        const output = document.getElementById('resultOutput');
+
+        btn.disabled = true;
+        btn.innerHTML = '⏳ 监控中...';
+        resultCard.style.display = 'block';
+        output.textContent = '正在启动监控...';
+
+        fetch('/api/monitor/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(r => r.json())
+        .then(result => {
+            btn.disabled = false;
+            btn.innerHTML = '🔍 开始监控';
+
+            if (result.success) {
+                output.textContent = result.output || '监控完成';
+                if (result.error) {
+                    output.textContent += '\n\n错误:\n' + result.error;
+                }
+            } else {
+                output.textContent = '监控失败:\n' + (result.error || '未知错误');
+            }
+        })
+        .catch(e => {
+            btn.disabled = false;
+            btn.innerHTML = '🔍 开始监控';
+            output.textContent = '网络错误: ' + e.message;
+        });
+    }
+    </script>
+</body>
+</html>
