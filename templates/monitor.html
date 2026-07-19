@@ -134,28 +134,37 @@ function startMonitor() {
     const btn = document.getElementById('startBtn');
     const btnText = document.getElementById('btnText');
 
-    // 先检查天眼查登录状态
-    btn.disabled = true;
-    btnText.textContent = '检查登录状态...';
+    // 检查是否启用了网页采集（需要天眼查登录）
+    const activeSources = {{ config.datasource.active | tojson }};
+    const needTianyanchaLogin = activeSources.includes('tianyancha_web');
 
-    fetch('/api/check-tianyancha-login')
-        .then(r => r.json())
-        .then(data => {
-            if (!data.logged_in) {
-                // 未登录，弹窗提示
+    if (needTianyanchaLogin) {
+        // 需要检查天眼查登录状态
+        btn.disabled = true;
+        btnText.textContent = '检查登录状态...';
+
+        fetch('/api/check-tianyancha-login')
+            .then(r => r.json())
+            .then(data => {
+                if (!data.logged_in) {
+                    // 未登录，弹窗提示
+                    btn.disabled = false;
+                    btnText.textContent = '开始监控';
+                    showTianyanchaLoginDialog();
+                    return;
+                }
+                // 已登录，继续启动监控
+                doStartMonitor();
+            })
+            .catch(e => {
                 btn.disabled = false;
                 btnText.textContent = '开始监控';
-                showTianyanchaLoginDialog();
-                return;
-            }
-            // 已登录，继续启动监控
-            doStartMonitor();
-        })
-        .catch(e => {
-            btn.disabled = false;
-            btnText.textContent = '开始监控';
-            showToast('检查登录状态失败: ' + e.message, 'error');
-        });
+                showToast('检查登录状态失败: ' + e.message, 'error');
+            });
+    } else {
+        // MCP API 不需要登录，直接启动
+        doStartMonitor();
+    }
 }
 
 function showTianyanchaLoginDialog() {
