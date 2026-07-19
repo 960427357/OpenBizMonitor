@@ -1,96 +1,194 @@
-# OpenBizMonitor
+# OpenBizMonitor v4.0
 
-企业监控系统 - 监控全国各地区的企业注册信息
+全国行业开业网吧监控系统 — 企业注册信息自动采集与监控平台
 
-## 功能
+## 功能概览
 
-- 多数据源支持（天眼查、企查查）
-- 自动监控企业注册信息
-- 支持全国所有省市区县
-- Tailwind CSS 现代化Web界面
-- 深色模式
-- JSON数据导出
-- 多地区、多关键词筛选
-- 排除关键词过滤
+### 采集的数据字段
+
+| 字段 | 说明 | 示例 |
+|------|------|------|
+| 企业名称 | 公司全称 | 南充市顺庆区铭双电竞工作室（个体工商户） |
+| 所属区域 | 省-市-区格式 | 四川省-南充市-顺庆区 |
+| 详细地址 | 注册地址 | 四川省南充市顺庆区中城街道万盛街76号 |
+| 法定代表人 | 投资人/经营者/法人 | 谢铭 |
+| 联系电话 | 手机号或座机号 | 1738105xxxx |
+| 注册资本 | 出资额 | 20万人民币 |
+| 成立日期 | 企业注册日期 | 2026-04-15 |
+| 企业状态 | 存续/筹建/已注销等 | 筹建审批中 |
+| 数据来源 | 采集来源 | 天眼查网页 |
+
+### 核心功能
+
+- **多用户系统** — 邀请码注册，每用户独立数据/配置/浏览器
+- **天眼查QR登录** — 无需打开浏览器，直接在网页扫码登录
+- **批量操作** — 批量选择、批量排除、批量修改状态、批量删除
+- **自动监控** — 定时/手动采集企业注册信息
+- **数据筛选** — 按区域、状态、时间、关键词筛选
+- **企业名称链接** — 点击名称直接跳转天眼查查询
 
 ## 快速开始
 
-### 环境要求
+### 方式一：Linux 服务器部署（推荐）
 
-- Python 3.9+
+```bash
+# 上传并解压
+unzip OpenBizMonitor-v4.0-deploy.zip -d OpenBizMonitor
+cd OpenBizMonitor
 
-### 安装
+# 一键部署
+chmod +x setup_ubuntu.sh
+./setup_ubuntu.sh
+
+# 启动服务
+source venv/bin/activate
+python3 web_app.py
+```
+
+访问 http://localhost:8080
+
+### 方式二：Windows 本地运行
 
 ```bash
 pip install -r requirements.txt
-```
-
-### 运行
-
-```bash
+playwright install chromium
 python web_app.py
 ```
 
 访问 http://localhost:8080
 
-### 配置
+## 使用指南
 
-首次运行后访问 http://localhost:8080/settings 进行配置：
+### 1. 注册账号
 
-1. 选择监控地区（省-市-区三级联动选择）
-2. 配置搜索关键词（默认：网吧、网咖、电竞）
-3. 配置数据源API Key（天眼查/企查查）
-4. 保存配置
+首次访问系统，会显示欢迎页面。点击"注册"创建账号。
 
-### 监控
+- **第一个注册的用户**自动成为管理员
+- 后续用户需要管理员生成的邀请码才能注册
 
-在Web界面点击"开始监控"，或直接运行：
+### 2. 管理员操作
 
-```bash
-python tianyancha_monitor.py
-```
+管理员登录后可以：
+- 访问 `/admin` 管理面板
+- 生成邀请码（用于新用户注册）
+- 查看所有用户列表
+
+### 3. 配置监控
+
+登录后进入"设置"页面：
+
+1. **监控地区**：三级联动选择省-市-区
+2. **搜索关键词**：默认 网吧、网咖、电竞（可自定义）
+3. **排除关键词**：默认 奶茶、餐饮、超市、便利店
+4. **时间范围**：最近 1-5 年
+
+### 4. 登录天眼查
+
+在设置页面点击"登录天眼查"，弹出QR码，用天眼查APP扫码登录。
+
+- 每个用户独立登录，互不影响
+- 登录成功后自动保存cookies
+
+### 5. 启动监控
+
+进入"开始监控"页面：
+- 系统会自动检测天眼查登录状态
+- 未登录会弹窗提示去登录
+- 点击"开始监控"开始采集数据
+
+### 6. 查看和管理数据
+
+在"数据列表"页面：
+- **搜索**：按名称、地址、法人搜索
+- **筛选**：按区域、状态、时间筛选
+- **批量操作**：勾选多条记录 → 批量排除/修改状态/删除
+- **点击名称**：直接跳转天眼查查询该企业
+- **导出**：导出JSON格式数据
 
 ## 目录结构
 
 ```
-├── web_app.py              # Flask Web应用
-├── tianyancha_monitor.py   # 监控脚本
-├── config_manager.py       # 配置管理
-├── data_sources.py         # 数据源抽象层（天眼查/企查查）
-├── region_map.py           # 地区映射数据
-├── requirements.txt        # 依赖
-├── config.json             # 配置文件（自动生成）
-├── database.json           # 数据库（自动生成）
-├── templates/              # HTML模板
-│   ├── base.html           # 共享布局
-│   ├── index.html          # 数据列表页
-│   ├── settings.html       # 设置页
-│   └── monitor.html        # 监控页
-├── static/                 # 静态资源
-│   ├── app.js              # 前端逻辑
+OpenBizMonitor/
+├── web_app.py              # Flask Web应用（API + 路由）
+├── browser_manager.py      # Playwright 浏览器管理（含反检测）
+├── data_sources.py         # 天眼查网页数据采集
+├── config_manager.py       # 配置和数据库管理（按用户隔离）
+├── user_manager.py         # 用户管理（注册/登录/邀请码）
+├── auth.py                 # 认证中间件
+├── tianyancha_monitor.py   # 监控任务脚本
+├── region_map.py           # 全国行政区划数据
+├── requirements.txt        # Python 依赖
+├── setup_ubuntu.sh         # Ubuntu 一键部署脚本
+├── start.sh                # 启动脚本
+├── DEPLOY.md               # 详细部署文档
+├── templates/
+│   ├── base.html           # 共享布局（导航栏 + 登录弹窗）
+│   ├── index.html          # 数据列表页（含批量操作）
+│   ├── settings.html       # 设置页（含天眼查QR登录）
+│   ├── monitor.html        # 监控页（含登录状态检查）
+│   ├── login.html          # 登录页
+│   ├── register.html       # 注册页（含邀请码）
+│   └── admin.html          # 管理员面板
+├── static/
+│   ├── app.js              # 前端逻辑（表格/筛选/批量操作）
 │   └── region-data.js      # 行政区划数据
-└── README.md
+└── data/                   # 用户数据（运行时生成）
+    ├── users.json          # 用户账号
+    └── user_data/          # 每用户独立目录
+        └── <user_id>/
+            ├── config.json     # 用户配置
+            ├── database.json   # 用户数据
+            └── browser_data/   # 用户浏览器cookies
 ```
-
-## 数据源
-
-### 天眼查
-
-1. 访问 https://open.tianyancha.com/ 获取API Key
-2. 在设置页面配置API Key
-
-### 企查查
-
-1. 获取企查查MCP API Key（Bearer Token）
-2. 在设置页面配置API Key并启用
-3. API地址默认为: `https://agent.qcc.com/mcp/company/stream`
 
 ## 技术栈
 
-- 后端：Flask 3.0
-- 前端：Tailwind CSS (CDN) + 原生JavaScript
-- 数据存储：JSON文件
-- Python依赖：Flask, Requests, openpyxl
+| 组件 | 技术 |
+|------|------|
+| 后端 | Python 3.9+ / Flask 3.0 |
+| 前端 | Tailwind CSS (CDN) + 原生 JavaScript |
+| 浏览器自动化 | Playwright (Chromium) |
+| 数据存储 | JSON 文件 |
+| 认证 | Flask Session + 邀请码 |
+
+## 采集原理
+
+系统使用 Playwright 无头浏览器模拟真实用户访问天眼查网页版搜索页面：
+
+1. 按"关键词 + 地区"组合构造搜索URL
+2. 无头浏览器访问页面，等待JS渲染完成
+3. 按企业分区提取数据，避免字段错位
+4. 解析企业名称、法人、资本、地址、电话、日期等字段
+5. 去重后保存到用户数据库
+
+## 更新日志
+
+### v4.0 (2026-07-19)
+- 新增多用户系统（邀请码注册、session认证）
+- 新增按用户隔离的数据/配置/浏览器cookies
+- 新增批量选择、批量排除、批量修改状态、批量删除
+- 新增电话号码字段采集
+- 天眼查登录改为无头浏览器QR码弹窗（WSL兼容）
+- 企业名称可点击跳转天眼查查询
+- 监控前自动检测天眼查登录状态
+- 修复数据解析：按企业分区提取避免字段错位
+- 修复编辑弹窗：改用自定义CSS弹窗
+- 新增管理员面板（邀请码管理、用户列表）
+
+### v3.0 (2026-07-19)
+- 天眼查QR码登录（无头浏览器，WSL兼容）
+- 反检测脚本（绕过天眼查反爬）
+- 修复法人/资本/日期字段解析
+- 按用户隔离浏览器cookies
+
+### v2.0 (2026-07-19)
+- Playwright无头浏览器采集
+- 多关键词/多地区监控
+- Web管理界面
+
+### v1.0 (2026-07-17)
+- 初始版本
+- 基础数据采集功能
 
 ## License
 
