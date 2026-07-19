@@ -62,18 +62,15 @@ def generate_search_combos(keyword, city_names):
 
 
 def deduplicate_results(results):
-    """对搜索结果去重"""
+    """对搜索结果去重，同名企业只保留一条"""
     seen = set()
     unique_results = []
 
     for record in results:
-        # 使用公司名称+地区作为去重键
         name = record.get('name', '')
-        area = record.get('area', '')
-        key = f"{name}_{area}"
-
-        if key not in seen:
-            seen.add(key)
+        # 只按公司名称去重（不按area，因为同名企业可能在不同搜索中出现）
+        if name and name not in seen:
+            seen.add(name)
             unique_results.append(record)
 
     return unique_results
@@ -112,55 +109,61 @@ class TianyanChaSource(DataSource):
             cutoff = datetime.now() - timedelta(days=time_range * 365)
             estiblish_time_start = cutoff.strftime('%Y-%m-%d')
 
-        # 提取地区名：优先取区县级，其次取市级
-        # 例如 "四川省-南充市-顺庆区" -> 取 "顺庆"（区县级更精准）
-        # 例如 "南充市" -> 取 "南充"（市级）
-        location_names = set()
-        for region in regions:
-            parts = region.split('-')
-            # 取最后一级（最具体的区县）
-            location_part = parts[-1] if parts else parts[0]
-            clean = location_part.replace('省', '').replace('市', '').replace('区', '').replace('县', '').replace('州', '')
-            if clean and len(clean) >= 2:
-                location_names.add(clean)
-
-        # 使用优化的搜索组合策略
-        search_combos = generate_search_combos(keyword, location_names)
         all_results = []
 
-        for search_key in search_combos:
-            logger.info("天眼查搜索: %s", search_key)
+        for region in regions:
+            parts = region.split('-')
+            # 提取市级和区县级名称
+            city_name = ''
+            district_name = ''
+            for part in parts:
+                clean = part.replace('省', '').replace('市', '').replace('区', '').replace('县', '').replace('州', '')
+                if not clean or len(clean) < 2:
+                    continue
+                if '市' in part:
+                    city_name = clean
+                elif '区' in part or '县' in part:
+                    district_name = clean
+                elif not city_name:
+                    city_name = clean
 
-            url = f"{self.api_url}/core/tools/call"
-            headers = {"Authorization": self.api_key, "Content-Type": "application/json"}
-            payload = {
-                "tool_name": "search_companies",
-                "arguments": {"searchKey": search_key, "pageSize": 20}
-            }
-            if estiblish_time_start:
-                payload["arguments"]["estiblishTimeStart"] = estiblish_time_start
+            # 搜索组合：先市级，再区县级
+            search_list = []
+            if city_name:
+                search_list.append((city_name, '市级'))
+            if district_name:
+                search_list.append((district_name, '区县级'))
 
-            try:
-                resp = requests.post(url, json=payload, headers=headers, timeout=30)
-                resp.raise_for_status()
-                items = resp.json().get('content', {}).get('items', [])
-            except Exception as e:
-                logger.error("天眼查搜索失败 [%s]: %s", search_key, e)
-                continue
+            for location, level in search_list:
+                search_key = location + ' ' + keyword
+                logger.info("天眼查搜索[%s]: %s", level, search_key)
 
-            for item in items:
-                record = self._parse(item, keyword)
-                if record:
-                    # 用搜索到的城市名补充地区信息（只提取城市名，不包含关键词）
-                    if (not record['address'] or record['area'] == '未知') and search_key != keyword:
-                        # 从搜索词中提取城市名（第一个词）
-                        search_city = search_key.split()[0] if search_key.split() else ''
-                        if search_city:
-                            record['area'] = search_city
-                            record['notes'] = f'搜索词: {search_key}'
-                    all_results.append(record)
+                url = f"{self.api_url}/core/tools/call"
+                headers = {"Authorization": self.api_key, "Content-Type": "application/json"}
+                payload = {
+                    "tool_name": "search_companies",
+                    "arguments": {"searchKey": search_key, "pageSize": 20}
+                }
+                if estiblish_time_start:
+                    payload["arguments"]["estiblishTimeStart"] = estiblish_time_start
 
-        # 对结果去重
+                try:
+                    resp = requests.post(url, json=payload, headers=headers, timeout=30)
+                    resp.raise_for_status()
+                    items = resp.json().get('content', {}).get('items', [])
+                except Exception as e:
+                    logger.error("天眼查搜索失败 [%s]: %s", search_key, e)
+                    continue
+
+                for item in items:
+                    record = self._parse(item, keyword)
+                    if record:
+                        # 用搜索到的地区名补充区域信息
+                        record['area'] = location
+                        record['notes'] = '搜索词: ' + search_key
+                        all_results.append(record)
+
+        # 去重：同名企业只保留一条
         return deduplicate_results(all_results)
 
     def get_company_detail(self, company_id):
