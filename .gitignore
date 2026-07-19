@@ -1,6 +1,15 @@
 # 敏感文件
 config.json
 database.json
+data/users.json
+data/user_data/
+
+# 浏览器数据
+browser_data/
+
+# 构建产物
+build/
+dist/
 
 # Python
 __pycache__/
@@ -19,7 +28,14 @@ env/
 
 # 日志
 *.log
+logs/
 
 # 临时文件
 *.tmp
 .DS_Store
+
+# 临时脚本
+_*.py
+
+# MiMoCode
+.mimocode/

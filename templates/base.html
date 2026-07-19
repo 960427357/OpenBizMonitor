@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ system_config.web.title }}{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    primary: { 50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81' },
+                }
+            }
+        }
+    }
+    </script>
+    <style>
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .slide-in { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        .pulse-badge { animation: pulseBadge 2s infinite; }
+        @keyframes pulseBadge { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen transition-colors duration-300">
+    <!-- Toast容器 -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <!-- 导航栏 -->
+    <nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6">
+            <div class="flex items-center justify-between h-14">
+                <a href="/" class="text-lg font-bold text-primary-600 dark:text-primary-400 flex items-center gap-2">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    {{ system_config.web.title }}
+                </a>
+                <div class="flex items-center gap-1 sm:gap-2">
+                    <a href="/" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">数据列表</a>
+                    <a href="/monitor" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">开始监控</a>
+                    <a href="/settings" class="px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">设置</a>
+                    <button id="darkToggle" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-lg" title="切换深色模式">
+                        <span class="dark:hidden">🌙</span>
+                        <span class="hidden dark:inline">☀️</span>
+                    </button>
+                    {% if current_user %}
+                    <div class="relative ml-1">
+                        <button onclick="document.getElementById('userMenu').classList.toggle('hidden')" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                            <span class="w-7 h-7 bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 rounded-full flex items-center justify-center text-xs font-bold">{{ current_user.username[0] | upper }}</span>
+                            <span class="hidden sm:inline">{{ current_user.username }}</span>
+                        </button>
+                        <div id="userMenu" class="hidden absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                            {% if current_user.role == 'admin' %}
+                            <a href="/admin" class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">管理面板</a>
+                            {% endif %}
+                            <button onclick="doLogout()" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700">退出登录</button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <button onclick="document.getElementById('loginModal').classList.remove('hidden')" class="px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white text-sm rounded-lg transition-colors">登录</button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="text-center py-4 text-sm text-gray-500 dark:text-gray-400">
+        OpenBizMonitor v3.0
+    </footer>
+
+    <!-- 登录弹窗 -->
+    <div id="loginModal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/50" onclick="document.getElementById('loginModal').classList.add('hidden')"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-[380px]">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">登录</h3>
+                <button onclick="document.getElementById('loginModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl">&times;</button>
+            </div>
+            <div id="loginError" class="hidden mb-3 p-2 bg-red-50 text-red-600 text-sm rounded-lg"></div>
+            <form id="loginForm" onsubmit="return handleModalLogin(event)">
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">用户名</label>
+                    <input type="text" id="modalUsername" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">密码</label>
+                    <input type="password" id="modalPassword" required class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none">
+                </div>
+                <button type="submit" id="modalLoginBtn" class="w-full py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors">登录</button>
+            </form>
+            <div class="mt-3 text-center text-sm text-gray-500">
+                还没有账号？<a href="/register" class="text-primary-600 hover:underline">注册</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/bootstrap.bundle.min.js?v=3.1"></script>
+    <script>
+    // 深色模式
+    const toggle = document.getElementById('darkToggle');
+    toggle?.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+        localStorage.setItem('darkMode', document.documentElement.classList.contains('dark'));
+    });
+    if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');
+
+    // Toast通知
+    function showToast(message, type) {
+        type = type || 'success';
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        const colors = {
+            success: 'bg-green-500', error: 'bg-red-500',
+            info: 'bg-blue-500', warning: 'bg-yellow-500 text-gray-900'
+        };
+        toast.className = (colors[type] || colors.info) + ' text-white px-4 py-3 rounded-lg shadow-lg slide-in flex items-center gap-3 min-w-[280px]';
+        const icons = { success: '✓', error: '✕', info: 'ℹ', warning: '⚠' };
+        toast.innerHTML = '<span class="font-bold">' + (icons[type] || 'ℹ') + '</span><span class="flex-1">' + escHtml(message) + '</span><button onclick="this.parentElement.remove()" class="opacity-70 hover:opacity-100 ml-2 text-lg">&times;</button>';
+        container.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 300); }, 4000);
+    }
+
+    function escHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str || '';
+        return d.innerHTML;
+    }
+
+    // 弹窗登录
+    function handleModalLogin(e) {
+        e.preventDefault();
+        const btn = document.getElementById('modalLoginBtn');
+        const errDiv = document.getElementById('loginError');
+        btn.disabled = true;
+        btn.textContent = '登录中...';
+        errDiv.classList.add('hidden');
+
+        fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                username: document.getElementById('modalUsername').value,
+                password: document.getElementById('modalPassword').value
+            })
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                errDiv.textContent = data.error || '登录失败';
+                errDiv.classList.remove('hidden');
+            }
+        }).catch(err => {
+            errDiv.textContent = '网络错误';
+            errDiv.classList.remove('hidden');
+        }).finally(() => {
+            btn.disabled = false;
+            btn.textContent = '登录';
+        });
+    }
+
+    // 退出登录
+    function doLogout() {
+        fetch('/api/auth/logout', {method: 'POST'}).then(() => {
+            window.location.href = '/login';
+        });
+    }
+
+    // 点击外部关闭用户菜单
+    document.addEventListener('click', function(e) {
+        const menu = document.getElementById('userMenu');
+        if (menu && !menu.classList.contains('hidden')) {
+            const btn = e.target.closest('button[onclick*="userMenu"]');
+            if (!btn && !e.target.closest('#userMenu')) {
+                menu.classList.add('hidden');
+            }
+        }
+    });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

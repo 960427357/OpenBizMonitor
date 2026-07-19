@@ -1,6 +1,13 @@
 // 全局数据
 let allRecords = [];
 
+// HTML转义函数（防XSS）
+function escHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str || '';
+    return d.innerHTML;
+}
+
 // 加载所有数据
 function loadAllRecords() {
     fetch('/api/search?q=')
@@ -18,7 +25,6 @@ function populateAreaFilter(records) {
     records.forEach(r => {
         if (r.area) {
             const areas = r.area.split('-');
-            // 添加最后一级
             areaSet.add(areas[areas.length - 1]);
         }
     });
@@ -26,7 +32,10 @@ function populateAreaFilter(records) {
     const select = document.getElementById('filterArea');
     select.innerHTML = '<option value="">全部区域</option>';
     Array.from(areaSet).sort().forEach(area => {
-        select.innerHTML += `<option value="${area}">${area}</option>`;
+        const opt = document.createElement('option');
+        opt.value = area;
+        opt.textContent = area;
+        select.appendChild(opt);
     });
 }
 
@@ -38,25 +47,21 @@ function applyFilters() {
     const filterTime = parseInt(document.getElementById('filterTime').value) || 0;
 
     let filtered = allRecords.filter(record => {
-        // 搜索文本筛选
         if (query) {
             const searchText = (record.name + ' ' + (record.address || '') + ' ' + (record.legal_person || '')).toLowerCase();
             if (!searchText.includes(query)) return false;
         }
 
-        // 区域筛选
         if (filterArea) {
             const areas = (record.area || '').split('-');
             const areaDisplay = areas[areas.length - 1] || '';
             if (areaDisplay !== filterArea) return false;
         }
 
-        // 状态筛选
         if (filterStatus && record.status !== filterStatus) {
             return false;
         }
 
-        // 时间筛选
         if (filterTime && record.establish_date) {
             try {
                 const establishDate = new Date(record.establish_date);
@@ -74,12 +79,10 @@ function applyFilters() {
     updateTable(filtered);
 }
 
-// 搜索功能
 function searchRecords() {
     applyFilters();
 }
 
-// 重置筛选
 function resetFilters() {
     document.getElementById('searchInput').value = '';
     document.getElementById('filterArea').value = '';
@@ -94,7 +97,7 @@ function updateTable(records) {
     tbody.innerHTML = '';
 
     if (records.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4">没有找到符合条件的记录</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4">没有找到符合条件的记录</td></tr>';
         return;
     }
 
@@ -105,25 +108,26 @@ function updateTable(records) {
         const statusClass = record.status === '筹建审批中' ? 'status-pending' :
                            record.status === '已排除' ? 'status-excluded' : '';
 
-        // 区域只显示最后一级
         let areaDisplay = record.area || '—';
         if (areaDisplay.includes('-')) {
             areaDisplay = areaDisplay.split('-').pop();
         }
 
         row.innerHTML =
-            '<td>' + record.id + '</td>' +
-            '<td><strong>' + record.name + '</strong><br><small>' + (record.address || '').substring(0, 30) + '...</small></td>' +
-            '<td>' + areaDisplay + '</td>' +
-            '<td>' + (record.legal_person || '—') + '</td>' +
-            '<td>' + (record.registered_capital || '—') + '</td>' +
-            '<td>' + (record.establish_date || '—') + '</td>' +
-            '<td><span class="status-badge ' + statusClass + '">' + record.status + '</span></td>' +
+            '<td><input type="checkbox" class="record-checkbox rounded" data-id="' + escHtml(record.id) + '" onchange="updateBatchBar()"></td>' +
+            '<td class="hidden">' + escHtml(record.id) + '</td>' +
+            '<td><a href="https://www.tianyancha.com/search?key=' + encodeURIComponent(record.name) + '" target="_blank" class="font-medium text-primary-600 dark:text-primary-400 hover:underline">' + escHtml(record.name) + '</a><br><small>' + escHtml((record.address || '').substring(0, 30)) + '...</small></td>' +
+            '<td>' + escHtml(areaDisplay) + '</td>' +
+            '<td>' + escHtml(record.legal_person || '—') + '</td>' +
+            '<td>' + escHtml(record.phone || '—') + '</td>' +
+            '<td>' + escHtml(record.registered_capital || '—') + '</td>' +
+            '<td>' + escHtml(record.establish_date || '—') + '</td>' +
+            '<td><span class="status-badge ' + statusClass + '">' + escHtml(record.status) + '</span></td>' +
             '<td>' +
-                '<button class="action-btn btn-view" onclick="viewRecord(\'' + record.id + '\')">👁️</button>' +
-                '<button class="action-btn btn-edit" onclick="editRecord(\'' + record.id + '\')">✏️</button>' +
-                '<button class="action-btn btn-delete" onclick="deleteRecord(\'' + record.id + '\')">🗑️</button>' +
-                '<button class="action-btn btn-exclude" onclick="excludeRecord(\'' + record.id + '\')">❌</button>' +
+                '<button class="action-btn btn-view" onclick="viewRecord(\'' + escHtml(record.id) + '\')" title="查看详情">👁️</button>' +
+                '<button class="action-btn btn-edit" onclick="editRecord(\'' + escHtml(record.id) + '\')" title="编辑">✏️</button>' +
+                '<button class="action-btn btn-delete" onclick="deleteRecord(\'' + escHtml(record.id) + '\')" title="删除">🗑️</button>' +
+                '<button class="action-btn btn-exclude" onclick="excludeRecord(\'' + escHtml(record.id) + '\')" title="屏蔽">❌</button>' +
             '</td>';
         tbody.appendChild(row);
     });
@@ -134,21 +138,28 @@ function viewRecord(id) {
     fetch('/api/records/' + id)
         .then(r => r.json())
         .then(record => {
-            document.getElementById('viewId').textContent = record.id || '—';
-            document.getElementById('viewName').textContent = record.name || '—';
-            document.getElementById('viewArea').textContent = record.area || '—';
-            document.getElementById('viewAddress').textContent = record.address || '—';
-            document.getElementById('viewLegal').textContent = record.legal_person || '—';
-            document.getElementById('viewCapital').textContent = record.registered_capital || '—';
-            document.getElementById('viewDate').textContent = record.establish_date || '—';
-            document.getElementById('viewStatus').textContent = record.status || '—';
-            document.getElementById('viewSource').textContent = record.source || '—';
-            document.getElementById('viewNotes').textContent = record.notes || '—';
-
-            const modal = new bootstrap.Modal(document.getElementById('viewModal'));
-            modal.show();
+            const body = document.getElementById('viewModalBody');
+            body.innerHTML = `
+                <table class="w-full text-sm">
+                    <tr><td class="py-2 pr-4 font-medium text-gray-500 w-24">企业名称</td><td class="py-2">${escHtml(record.name || '—')}</td></tr>
+                    <tr><td class="py-2 pr-4 font-medium text-gray-500">区域</td><td class="py-2">${escHtml(record.area || '—')}</td></tr>
+                    <tr><td class="py-2 pr-4 font-medium text-gray-500">地址</td><td class="py-2">${escHtml(record.address || '—')}</td></tr>
+                    <tr><td class="py-2 pr-4 font-medium text-gray-500">法人</td><td class="py-2">${escHtml(record.legal_person || '—')}</td></tr>
+                    <tr><td class="py-2 pr-4 font-medium text-gray-500">电话</td><td class="py-2">${escHtml(record.phone || '—')}</td></tr>
+                    <tr><td class="py-2 pr-4 font-medium text-gray-500">注册资本</td><td class="py-2">${escHtml(record.registered_capital || '—')}</td></tr>
+                    <tr><td class="py-2 pr-4 font-medium text-gray-500">成立日期</td><td class="py-2">${escHtml(record.establish_date || '—')}</td></tr>
+                    <tr><td class="py-2 pr-4 font-medium text-gray-500">状态</td><td class="py-2">${escHtml(record.status || '—')}</td></tr>
+                    <tr><td class="py-2 pr-4 font-medium text-gray-500">来源</td><td class="py-2">${escHtml(record.source || '—')}</td></tr>
+                    <tr><td class="py-2 pr-4 font-medium text-gray-500">备注</td><td class="py-2">${escHtml(record.notes || '—')}</td></tr>
+                </table>
+            `;
+            document.getElementById('viewModal').classList.remove('hidden');
         })
         .catch(err => alert('获取详情失败: ' + err.message));
+}
+
+function closeViewModal() {
+    document.getElementById('viewModal').classList.add('hidden');
 }
 
 // 编辑记录
@@ -156,33 +167,35 @@ function editRecord(id) {
     fetch('/api/records/' + id)
         .then(r => r.json())
         .then(record => {
-            // 确保模态框元素存在
-            setTimeout(() => {
-                const editId = document.getElementById('editId');
-                const editName = document.getElementById('editName');
-                const editArea = document.getElementById('editArea');
-                
-                if (!editId || !editName || !editArea) {
-                    alert('编辑表单未加载，请刷新页面重试');
-                    return;
-                }
-                
-                editId.value = record.id || '';
-                editName.value = record.name || '';
-                editArea.value = record.area || '';
-                document.getElementById('editAddress').value = record.address || '';
-                document.getElementById('editLegal').value = record.legal_person || '';
-                document.getElementById('editCapital').value = record.registered_capital || '';
-                document.getElementById('editDate').value = record.establish_date || '';
-                document.getElementById('editStatus').value = record.status || '筹建审批中';
-                document.getElementById('editSource').value = record.source || '天眼查';
-                document.getElementById('editNotes').value = record.notes || '';
-
-                const modal = new bootstrap.Modal(document.getElementById('editModal'));
-                modal.show();
-            }, 100);
+            const fields = {
+                'editId': record.id || '',
+                'editName': record.name || '',
+                'editArea': record.area || '',
+                'editAddress': record.address || '',
+                'editLegal': record.legal_person || '',
+                'editPhone': record.phone || '',
+                'editCapital': record.registered_capital || '',
+                'editDate': record.establish_date || '',
+                'editStatus': record.status || '筹建审批中',
+                'editSource': record.source || '天眼查',
+                'editNotes': record.notes || ''
+            };
+            for (const [id, value] of Object.entries(fields)) {
+                const el = document.getElementById(id);
+                if (el) el.value = value;
+            }
+            const modal = document.getElementById('editModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+            } else {
+                alert('编辑弹窗未加载，请刷新页面重试');
+            }
         })
         .catch(err => alert('获取记录失败: ' + err.message));
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
 }
 
 // 保存编辑
@@ -193,6 +206,7 @@ function saveRecord() {
         area: document.getElementById('editArea').value,
         address: document.getElementById('editAddress').value,
         legal_person: document.getElementById('editLegal').value,
+        phone: document.getElementById('editPhone').value,
         registered_capital: document.getElementById('editCapital').value,
         establish_date: document.getElementById('editDate').value,
         status: document.getElementById('editStatus').value,
@@ -207,11 +221,11 @@ function saveRecord() {
     })
     .then(r => r.json())
     .then(res => {
-        alert('保存成功');
-        bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
-        applyFilters();
+        showToast('保存成功', 'success');
+        closeEditModal();
+        loadAllRecords();
     })
-    .catch(err => alert('保存失败: ' + err.message));
+    .catch(err => showToast('保存失败: ' + err.message, 'error'));
 }
 
 // 删除记录
@@ -219,32 +233,33 @@ function deleteRecord(id) {
     if (!confirm('确定删除此记录吗？')) return;
 
     fetch('/api/records/' + id, {method: 'DELETE'})
-        .then(() => {
-            alert('删除成功');
-            applyFilters();
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                showToast('删除成功', 'success');
+                loadAllRecords(); // 重新加载数据
+            } else {
+                showToast('删除失败: ' + (res.message || '未知错误'), 'error');
+            }
         })
-        .catch(err => alert('删除失败: ' + err.message));
+        .catch(err => showToast('删除失败: ' + err.message, 'error'));
 }
 
-// 排除记录
+// 排除记录（使用专用端点，单次请求）
 function excludeRecord(id) {
     if (!confirm('确定标记为"不是网吧"吗？此记录将被隐藏。')) return;
 
-    fetch('/api/records/' + id)
+    fetch('/api/records/' + id + '/exclude', {method: 'POST'})
         .then(r => r.json())
-        .then(record => {
-            record.status = '已排除';
-            return fetch('/api/records/' + id, {
-                method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(record)
-            });
+        .then(res => {
+            if (res.success) {
+                showToast('已标记排除', 'success');
+                loadAllRecords(); // 重新加载数据
+            } else {
+                showToast('操作失败: ' + (res.message || '未知错误'), 'error');
+            }
         })
-        .then(() => {
-            alert('已标记排除');
-            applyFilters();
-        })
-        .catch(err => alert('操作失败: ' + err.message));
+        .catch(err => showToast('操作失败: ' + err.message, 'error'));
 }
 
 // 清除所有数据
@@ -253,22 +268,28 @@ function clearAllData() {
     if (!confirm('再次确认：确定要删除所有企业数据吗？')) return;
 
     fetch('/api/records/clear', {method: 'DELETE'})
-        .then(() => {
-            alert('已清除所有数据');
-            location.reload();
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                showToast('已清除所有数据', 'success');
+                setTimeout(() => location.reload(), 500);
+            } else {
+                showToast('清除失败: ' + (res.message || '未知错误'), 'error');
+            }
         })
-        .catch(err => alert('清除失败: ' + err.message));
+        .catch(err => showToast('清除失败: ' + err.message, 'error'));
 }
 
 // 导出数据
 function exportData() {
     fetch('/api/export')
-        .then(r => r.blob())
-        .then(blob => {
+        .then(r => r.json())
+        .then(data => {
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = '网吧数据_' + new Date().toISOString().split('T')[0] + '.xlsx';
+            a.download = '网吧数据_' + new Date().toISOString().split('T')[0] + '.json';
             a.click();
             window.URL.revokeObjectURL(url);
         })
@@ -285,3 +306,149 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('filterStatus').addEventListener('change', applyFilters);
     document.getElementById('filterTime').addEventListener('change', applyFilters);
 });
+
+// ==================== 批量操作 ====================
+
+// 全选/取消全选
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.record-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = selectAll.checked;
+        const row = cb.closest('tr');
+        if (row) {
+            row.classList.toggle('bg-primary-50', selectAll.checked);
+            row.classList.toggle('dark:bg-primary-900/20', selectAll.checked);
+        }
+    });
+    updateBatchBar();
+}
+
+// 更新批量操作栏
+function updateBatchBar() {
+    const count = getSelectedIds().length;
+    const batchBar = document.getElementById('batchBar');
+    const countEl = document.getElementById('selectedCount');
+
+    if (count > 0) {
+        batchBar.classList.remove('hidden');
+        countEl.textContent = count;
+    } else {
+        batchBar.classList.add('hidden');
+    }
+
+    // 更新行高亮
+    document.querySelectorAll('.record-checkbox').forEach(cb => {
+        const row = cb.closest('tr');
+        if (row) {
+            row.classList.toggle('bg-primary-50', cb.checked);
+            row.classList.toggle('dark:bg-primary-900/20', cb.checked);
+        }
+    });
+}
+
+// 获取选中的ID列表
+function getSelectedIds() {
+    const ids = [];
+    document.querySelectorAll('.record-checkbox:checked').forEach(cb => {
+        ids.push(cb.dataset.id);
+    });
+    return ids;
+}
+
+// 取消选择
+function clearSelection() {
+    document.querySelectorAll('.record-checkbox').forEach(cb => {
+        cb.checked = false;
+        const row = cb.closest('tr');
+        if (row) {
+            row.classList.remove('bg-primary-50', 'dark:bg-primary-900/20');
+        }
+    });
+    document.getElementById('selectAll').checked = false;
+    updateBatchBar();
+}
+
+// 批量排除
+function batchExclude() {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    if (!confirm('确定排除选中的 ' + ids.length + ' 条记录吗？')) return;
+
+    fetch('/api/records/batch/exclude', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids: ids})
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast('已排除 ' + res.updated + ' 条记录', 'success');
+            loadAllRecords();
+            clearSelection();
+        } else {
+            showToast('操作失败: ' + (res.error || ''), 'error');
+        }
+    })
+    .catch(err => showToast('操作失败: ' + err.message, 'error'));
+}
+
+// 显示批量修改状态弹窗
+function showBatchStatusModal() {
+    if (!getSelectedIds().length) return;
+    document.getElementById('batchStatusModal').classList.remove('hidden');
+}
+
+// 关闭批量修改状态弹窗
+function closeBatchStatusModal() {
+    document.getElementById('batchStatusModal').classList.add('hidden');
+}
+
+// 批量修改状态
+function batchChangeStatus() {
+    const ids = getSelectedIds();
+    const status = document.getElementById('batchStatusSelect').value;
+    if (!ids.length || !status) return;
+
+    fetch('/api/records/batch/status', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids: ids, status: status})
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast('已更新 ' + res.updated + ' 条记录状态为「' + status + '」', 'success');
+            closeBatchStatusModal();
+            loadAllRecords();
+            clearSelection();
+        } else {
+            showToast('操作失败: ' + (res.error || ''), 'error');
+        }
+    })
+    .catch(err => showToast('操作失败: ' + err.message, 'error'));
+}
+
+// 批量删除
+function batchDelete() {
+    const ids = getSelectedIds();
+    if (!ids.length) return;
+    if (!confirm('确定删除选中的 ' + ids.length + ' 条记录吗？此操作不可恢复！')) return;
+
+    fetch('/api/records/batch/delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ids: ids})
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast('已删除 ' + res.deleted + ' 条记录', 'success');
+            loadAllRecords();
+            clearSelection();
+        } else {
+            showToast('操作失败: ' + (res.error || ''), 'error');
+        }
+    })
+    .catch(err => showToast('操作失败: ' + err.message, 'error'));
+}

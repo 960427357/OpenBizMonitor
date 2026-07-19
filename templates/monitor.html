@@ -1,99 +1,266 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>监控 - {{ config.web.title }}</title>
-    <link href="/static/bootstrap.min.css" rel="stylesheet">
-    <link href="/static/bootstrap-icons.css" rel="stylesheet">
-    <style>
-        body {background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px;}
-        .container {background: white; border-radius: 20px; padding: 30px; max-width: 800px; margin: 0 auto;}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h3 class="mb-4">🔍 数据监控</h3>
-        <a href="/" class="btn btn-outline-secondary mb-3">← 返回</a>
+{% extends "base.html" %}
+{% block title %}监控 - {{ system_config.web.title }}{% endblock %}
 
-        {% if not config.tianyancha.api_key %}
-        <div class="alert alert-warning">
-            ⚠️ <strong>未配置天眼查API Key！</strong>
-            <br>请先访问 <a href="/settings">设置页面</a> 配置API Key。
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/" class="text-gray-500 hover:text-primary-500 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        </a>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">数据监控</h1>
+    </div>
+
+    <!-- API未配置警告 -->
+    {% if not config.tianyancha.api_key %}
+    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 mb-5 flex items-start gap-3">
+        <span class="text-amber-500 text-xl mt-0.5">⚠️</span>
+        <div>
+            <p class="font-medium text-amber-800 dark:text-amber-300">未配置天眼查API Key</p>
+            <p class="text-sm text-amber-600 dark:text-amber-400 mt-1">请先访问 <a href="/settings" class="underline hover:no-underline">设置页面</a> 配置API Key。</p>
         </div>
-        {% endif %}
+    </div>
+    {% endif %}
 
-        <div class="card mb-3">
-            <h5 class="card-header">📊 当前配置</h5>
-            <div class="card-body">
-                <p><strong>监控地区:</strong> 
+    <!-- 当前配置 -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 mb-5">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">当前配置</h2>
+        <div class="space-y-2 text-sm">
+            <div class="flex justify-between">
+                <span class="text-gray-500 dark:text-gray-400">监控地区</span>
+                <span class="text-gray-800 dark:text-gray-200 text-right max-w-[60%]">
                     {% if config.monitor.regions %}
                         {{ config.monitor.regions|join(', ') }}
                     {% else %}
-                        未配置（请先<a href="/settings">设置监控地区</a>）
+                        <span class="text-amber-500">未配置</span> <a href="/settings" class="text-primary-500 hover:underline">设置→</a>
                     {% endif %}
-                </p>
-                <p><strong>搜索关键词:</strong> {{ config.monitor.keywords|join(', ') }}</p>
-                <p><strong>排除关键词:</strong> {{ config.monitor.exclude_keywords|join(', ') or '无' }}</p>
-                <p><strong>搜索时间:</strong> 最近{{ config.monitor.get('time_range', 1) }}年</p>
-                <p><strong>API状态:</strong> {{ '✅ 已配置' if config.tianyancha.api_key else '❌ 未配置' }}</p>
+                </span>
             </div>
-        </div>
-
-        <div class="card mb-3">
-            <h5 class="card-header">🚀 开始监控</h5>
-            <div class="card-body">
-                <p class="text-muted">点击下方按钮开始搜索天眼查，查找新开业的网吧企业。</p>
-                <button class="btn btn-primary btn-lg w-100" onclick="startMonitor()" id="startBtn">
-                    🔍 开始监控
-                </button>
+            <div class="flex justify-between">
+                <span class="text-gray-500 dark:text-gray-400">搜索关键词</span>
+                <span class="text-gray-800 dark:text-gray-200">{{ config.monitor.keywords|join(', ') }}</span>
             </div>
-        </div>
-
-        <div class="card" id="resultCard" style="display: none;">
-            <h5 class="card-header">📋 监控结果</h5>
-            <div class="card-body">
-                <pre id="resultOutput" style="background: #f8f9fa; padding: 15px; border-radius: 8px; max-height: 400px; overflow-y: auto;"></pre>
+            <div class="flex justify-between">
+                <span class="text-gray-500 dark:text-gray-400">排除关键词</span>
+                <span class="text-gray-800 dark:text-gray-200">{{ config.monitor.exclude_keywords|join(', ') or '无' }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500 dark:text-gray-400">搜索时间</span>
+                <span class="text-gray-800 dark:text-gray-200">最近{{ config.monitor.get('time_range', 1) }}年</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500 dark:text-gray-400">天眼查API</span>
+                {% if config.tianyancha.api_key %}
+                <span class="inline-flex items-center gap-1 text-green-600 dark:text-green-400"><span class="w-2 h-2 bg-green-500 rounded-full"></span>已配置</span>
+                {% else %}
+                <span class="inline-flex items-center gap-1 text-red-500"><span class="w-2 h-2 bg-red-500 rounded-full"></span>未配置</span>
+                {% endif %}
             </div>
         </div>
     </div>
 
-    <script src="/static/bootstrap.bundle.min.js"></script>
-    <script>
-    function startMonitor() {
-        const btn = document.getElementById('startBtn');
-        const resultCard = document.getElementById('resultCard');
-        const output = document.getElementById('resultOutput');
+    <!-- 开始监控 -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 mb-5">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">开始监控</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">点击按钮搜索数据源，查找新开业的企业。</p>
+        <button onclick="startMonitor()" id="startBtn" class="w-full py-3 bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <span id="btnText">开始监控</span>
+        </button>
+    </div>
 
-        btn.disabled = true;
-        btn.innerHTML = '⏳ 监控中...';
-        resultCard.style.display = 'block';
-        output.textContent = '正在启动监控...';
+    <!-- 监控结果 -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5" id="resultCard" style="display: none;">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">监控结果</h2>
+        <pre id="resultOutput" class="bg-gray-50 dark:bg-gray-750 p-4 rounded-lg text-sm text-gray-700 dark:text-gray-300 max-h-96 overflow-y-auto whitespace-pre-wrap font-mono"></pre>
+    </div>
+</div>
 
-        fetch('/api/monitor/start', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'}
-        })
+<!-- 天眼查未登录提示弹窗 -->
+<div id="tianyanchaLoginDialog" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50" onclick="closeTianyanchaLoginDialog()"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-[400px]">
+        <div class="text-center">
+            <div class="text-5xl mb-4">🔐</div>
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">天眼查未登录</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">启动监控前需要先登录天眼查账号。请前往设置页面扫码登录后，再返回启动监控。</p>
+            <div class="flex gap-3">
+                <button onclick="closeTianyanchaLoginDialog()" class="flex-1 py-2.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors">取消</button>
+                <button onclick="goToSettings()" class="flex-1 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors">去登录</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let _pollTimer = null;
+
+// 页面加载时检查是否有监控正在运行
+document.addEventListener('DOMContentLoaded', function() {
+    checkMonitorStatus();
+});
+
+function checkMonitorStatus() {
+    fetch('/api/monitor/status')
         .then(r => r.json())
-        .then(result => {
-            btn.disabled = false;
-            btn.innerHTML = '🔍 开始监控';
+        .then(status => {
+            if (status.running) {
+                // 有监控正在运行，显示状态并开始轮询
+                const btn = document.getElementById('startBtn');
+                const btnText = document.getElementById('btnText');
+                const resultCard = document.getElementById('resultCard');
+                const output = document.getElementById('resultOutput');
 
-            if (result.success) {
-                output.textContent = result.output || '监控完成';
-                if (result.error) {
-                    output.textContent += '\n\n错误:\n' + result.error;
+                btn.disabled = true;
+                btnText.textContent = '监控运行中...';
+                resultCard.style.display = 'block';
+
+                if (status.output) {
+                    output.textContent = status.output;
+                    output.scrollTop = output.scrollHeight;
+                } else {
+                    output.textContent = '监控任务正在运行中...\n';
                 }
-            } else {
-                output.textContent = '监控失败:\n' + (result.error || '未知错误');
+
+                startPolling();
+                showToast('检测到监控任务正在运行', 'info');
             }
+        })
+        .catch(() => {});
+}
+
+function startMonitor() {
+    const btn = document.getElementById('startBtn');
+    const btnText = document.getElementById('btnText');
+
+    // 先检查天眼查登录状态
+    btn.disabled = true;
+    btnText.textContent = '检查登录状态...';
+
+    fetch('/api/check-tianyancha-login')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.logged_in) {
+                // 未登录，弹窗提示
+                btn.disabled = false;
+                btnText.textContent = '开始监控';
+                showTianyanchaLoginDialog();
+                return;
+            }
+            // 已登录，继续启动监控
+            doStartMonitor();
         })
         .catch(e => {
             btn.disabled = false;
-            btn.innerHTML = '🔍 开始监控';
-            output.textContent = '网络错误: ' + e.message;
+            btnText.textContent = '开始监控';
+            showToast('检查登录状态失败: ' + e.message, 'error');
         });
+}
+
+function showTianyanchaLoginDialog() {
+    document.getElementById('tianyanchaLoginDialog').classList.remove('hidden');
+}
+
+function closeTianyanchaLoginDialog() {
+    document.getElementById('tianyanchaLoginDialog').classList.add('hidden');
+}
+
+function goToSettings() {
+    window.location.href = '/settings';
+}
+
+function doStartMonitor() {
+    const btn = document.getElementById('startBtn');
+    const btnText = document.getElementById('btnText');
+    const resultCard = document.getElementById('resultCard');
+    const output = document.getElementById('resultOutput');
+
+    btn.disabled = true;
+    btnText.textContent = '启动中...';
+    resultCard.style.display = 'block';
+    output.textContent = '正在启动监控任务，请稍候...\n';
+
+    fetch('/api/monitor/start', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showToast('监控已启动，正在后台运行', 'info');
+            btnText.textContent = '监控运行中...';
+            output.textContent += '监控任务已启动，正在搜索数据源...\n\n';
+            // 开始轮询状态
+            startPolling();
+        } else {
+            btn.disabled = false;
+            btnText.textContent = '开始监控';
+            output.textContent += '启动失败: ' + (result.error || '未知错误');
+            showToast('启动失败: ' + (result.error || ''), 'error');
+        }
+    })
+    .catch(e => {
+        btn.disabled = false;
+        btnText.textContent = '开始监控';
+        output.textContent += '网络错误: ' + e.message;
+        showToast('网络错误', 'error');
+    });
+}
+
+function startPolling() {
+    if (_pollTimer) clearInterval(_pollTimer);
+    _pollTimer = setInterval(pollStatus, 2000);
+    pollStatus();
+}
+
+function pollStatus() {
+    fetch('/api/monitor/status')
+        .then(r => r.json())
+        .then(status => {
+            const output = document.getElementById('resultOutput');
+            const btn = document.getElementById('startBtn');
+            const btnText = document.getElementById('btnText');
+
+            // 更新输出内容
+            if (status.output) {
+                output.textContent = status.output;
+                // 自动滚动到底部
+                output.scrollTop = output.scrollHeight;
+            }
+
+            if (!status.running) {
+                // 已完成
+                clearInterval(_pollTimer);
+                _pollTimer = null;
+                btn.disabled = false;
+                btnText.textContent = '开始监控';
+
+                if (status.output && status.output.includes('监控完成')) {
+                    showToast('监控完成', 'success');
+                } else if (status.returncode !== 0 && status.output) {
+                    showToast('监控完成（有错误）', 'warning');
+                } else {
+                    showToast('监控完成', 'success');
+                }
+            }
+        })
+        .catch(() => {
+            // 轮询出错不停止，等下次重试
+        });
+}
+
+// 页面离开时清理轮询（但不清理后端进程）
+window.addEventListener('beforeunload', () => {
+    if (_pollTimer) clearInterval(_pollTimer);
+});
+
+// 页面可见时恢复轮询
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && !_pollTimer) {
+        // 页面重新可见，检查是否有监控在运行
+        checkMonitorStatus();
     }
-    </script>
-</body>
-</html>
+});
+</script>
+{% endblock %}

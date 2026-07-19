@@ -1,201 +1,335 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ config.web.title }}</title>
-    <link href="/static/bootstrap.min.css" rel="stylesheet">
-    <link href="/static/bootstrap-icons.css" rel="stylesheet">
-    <style>
-        :root {--primary: #6366f1;}
-        body {background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; font-family: system-ui, -apple-system, sans-serif;}
-        .main-container {background: rgba(255,255,255,0.95); border-radius: 20px; margin: 20px auto; max-width: 1400px;}
-        .header {background: linear-gradient(135deg, var(--primary), #8b5cf6); color: white; padding: 25px; border-radius: 20px 20px 0 0; text-align: center;}
-        .card {background: white; border-radius: 15px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);}
-        .stats-number {font-size: 2rem; font-weight: 700; color: var(--primary);}
-        .status-badge {padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500;}
-        .status-pending {background: linear-gradient(135deg, #ff6b6b, #ee5a24); color: white; animation: pulse 2s infinite;}
-        @keyframes pulse {0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-        .status-excluded {background: #e5e7eb; color: #6b7280; text-decoration: line-through;}
-        .action-btn {padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; margin: 2px; border: none; cursor: pointer;}
-        .btn-edit {background: var(--primary); color: white;}
-        .btn-delete {background: #ef4444; color: white;}
-        .btn-exclude {background: #6b7280; color: white;}
-        .btn-view {background: #10b981; color: white;}
-        .table {background: white;}
-        .table thead th {background: linear-gradient(135deg, var(--primary), #8b5cf6); color: white; border: none;}
-    </style>
-</head>
-<body>
-    <div class="container p-4">
-        <div class="main-container">
-            <div class="header">
-                <h3>🎮 {{ config.web.title }}</h3>
-                <small class="text-white-70">企业总数: {{ stats.total }} | 数据库: {{ stats.recent[0].last_updated if stats.recent else '—' }}</small>
-                <div class="mt-2">
-                    <a href="/" class="btn btn-light btn-sm">📊 数据列表</a>
-                    <a href="/monitor" class="btn btn-light btn-sm">🔍 开始监控</a>
-                    <a href="/settings" class="btn btn-light btn-sm">⚙️ 设置</a>
-                </div>
-            </div>
+{% extends "base.html" %}
 
-            <div class="row p-3">
-                <div class="col-md-3"><div class="card text-center"><div class="stats-number">{{ stats.total }}</div><div>企业总数</div></div></div>
-                <div class="col-md-3"><div class="card text-center"><div class="stats-number">{{ stats.by_status.get('筹建审批中', 0) }}</div><div>筹建审批中</div></div></div>
-                <div class="col-md-3"><div class="card text-center"><div class="stats-number">{{ stats.by_status.get('已正常营业', 0) }}</div><div>已正常营业</div></div></div>
-                <div class="col-md-3"><div class="card text-center"><div class="stats-number">{{ stats.by_area|length }}</div><div>覆盖区域</div></div></div>
-            </div>
+{% block content %}
 
-            <div class="p-3">
-                <div class="card">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="mb-0">📋 企业列表</h5>
-                        <div>
-                            <button class="btn btn-danger btn-sm" onclick="clearAllData()">🗑️ 清除所有数据</button>
-                            <button class="btn btn-success btn-sm" onclick="exportData()">📥 导出</button>
-                        </div>
-                    </div>
-                    <div class="input-group mb-3">
-                        <input type="text" id="searchInput" class="form-control" placeholder="搜索企业名称、地址、法人...">
-                        <button class="btn btn-primary" onclick="searchRecords()">🔍 搜索</button>
-                        <button class="btn btn-secondary" onclick="resetFilters()">🔄 重置</button>
-                    </div>
-                    <!-- 筛选器 -->
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label class="form-label small">🌍 区域</label>
-                            <select id="filterArea" class="form-select form-select-sm">
-                                <option value="">全部区域</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small">📊 状态</label>
-                            <select id="filterStatus" class="form-select form-select-sm">
-                                <option value="">全部状态</option>
-                                <option value="筹建审批中">筹建审批中</option>
-                                <option value="已正常营业">已正常营业</option>
-                                <option value="已排除">已排除</option>
-                                <option value="已关闭">已关闭</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small">📅 成立时间</label>
-                            <select id="filterTime" class="form-select form-select-sm">
-                                <option value="">全部时间</option>
-                                <option value="365">最近1年</option>
-                                <option value="730">最近2年</option>
-                                <option value="1095">最近3年</option>
-                                <option value="1825">最近5年</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-                        <table class="table table-hover">
-                            <thead><tr><th>ID</th><th>企业名称</th><th>区域</th><th>法人</th><th>资本</th><th>成立日期</th><th>状态</th><th>操作</th></tr></thead>
-                            <tbody id="recordsTable">
-                                {% for record in records %}
-                                <tr data-id="{{ record.id }}">
-                                    <td>{{ record.id }}</td>
-                                    <td><strong>{{ record.name }}</strong><br><small>{{ record.address[:30] }}...</small></td>
-                                    <td>{{ record.area.split('-')[-1] if '-' in record.area else record.area }}</td>
-                                    <td>{{ record.legal_person or '—' }}</td>
-                                    <td>{{ record.registered_capital or '—' }}</td>
-                                    <td>{{ record.establish_date or '—' }}</td>
-                                    <td><span class="status-badge status-{{ record.status|lower|replace(' ', '-') }}">{{ record.status }}</span></td>
-                                    <td>
-                                        <button class="action-btn btn-view" onclick="viewRecord('{{ record.id }}')">👁️</button>
-                                        <button class="action-btn btn-edit" onclick="editRecord('{{ record.id }}')">✏️</button>
-                                        <button class="action-btn btn-delete" onclick="deleteRecord('{{ record.id }}')">🗑️</button>
-                                        <button class="action-btn btn-exclude" onclick="excludeRecord('{{ record.id }}')">❌</button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+{% if not current_user %}
+<!-- 未登录提示 -->
+<div class="bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-xl p-6 mb-6 text-center">
+    <div class="text-primary-600 dark:text-primary-400 text-4xl mb-3">🔐</div>
+    <h2 class="text-xl font-bold text-gray-800 dark:text-gray-200 mb-2">欢迎使用网吧监控系统</h2>
+    <p class="text-gray-600 dark:text-gray-400 mb-4">登录后即可查看和管理您的企业监控数据</p>
+    <button onclick="document.getElementById('loginModal').classList.remove('hidden')" class="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors">
+        立即登录
+    </button>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mt-3">还没有账号？<a href="/register" class="text-primary-600 hover:underline">注册</a></p>
+</div>
+{% endif %}
+
+<!-- 统计卡片 -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 text-center">
+        <div class="text-3xl font-bold text-primary-600 dark:text-primary-400">{{ stats.total }}</div>
+        <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">企业总数</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 text-center">
+        <div class="text-3xl font-bold text-amber-500">{{ stats.by_status.get('筹建审批中', 0) }}</div>
+        <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">筹建审批中</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 text-center">
+        <div class="text-3xl font-bold text-green-500">{{ stats.by_status.get('已正常营业', 0) }}</div>
+        <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">已正常营业</div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 text-center">
+        <div class="text-3xl font-bold text-blue-500">{{ stats.by_area|length }}</div>
+        <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">覆盖区域</div>
+    </div>
+</div>
+
+<!-- 工具栏 -->
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-4 mb-6">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">企业列表</h2>
+        <div class="flex items-center gap-2">
+            <button onclick="showAddModal()" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors">添加企业</button>
+            <button onclick="clearAllData()" class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg transition-colors">清除所有</button>
+            <button onclick="exportData()" class="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-sm rounded-lg transition-colors">导出JSON</button>
         </div>
     </div>
 
-    <div class="modal fade" id="viewModal" tabindex="-1">
-        <div class="modal-dialog"><div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">企业详情</h5><button class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body" id="viewModalBody"></div>
-        </div></div>
+    <!-- 搜索 -->
+    <div class="flex gap-2 mb-4">
+        <input type="text" id="searchInput" class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none" placeholder="搜索企业名称、地址、法人...">
+        <button onclick="searchRecords()" class="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white text-sm rounded-lg transition-colors">搜索</button>
+        <button onclick="resetFilters()" class="px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-colors">重置</button>
     </div>
 
-    <!-- 编辑模态框 -->
-    <div class="modal fade" id="editModal" tabindex="-1">
-        <div class="modal-dialog modal-lg"><div class="modal-content">
-            <div class="modal-header" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white;">
-                <h5 class="modal-title">编辑企业信息</h5>
-                <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    <!-- 筛选器 -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">区域</label>
+            <select id="filterArea" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none">
+                <option value="">全部区域</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">状态</label>
+            <select id="filterStatus" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none">
+                <option value="">全部状态</option>
+                <option value="筹建审批中">筹建审批中</option>
+                <option value="已正常营业">已正常营业</option>
+                <option value="已排除">已排除</option>
+                <option value="已关闭">已关闭</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">成立时间</label>
+            <select id="filterTime" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none">
+                <option value="">全部时间</option>
+                <option value="365">最近1年</option>
+                <option value="730">最近2年</option>
+                <option value="1095">最近3年</option>
+                <option value="1825">最近5年</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<!-- 批量操作栏 -->
+<div id="batchBar" class="hidden bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 rounded-xl p-3 mb-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+        <span class="text-sm text-primary-700 dark:text-primary-300">已选 <strong id="selectedCount">0</strong> 项</span>
+        <button onclick="batchExclude()" class="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded-lg transition-colors">批量排除</button>
+        <button onclick="showBatchStatusModal()" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg transition-colors">批量修改状态</button>
+        <button onclick="batchDelete()" class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs rounded-lg transition-colors">批量删除</button>
+    </div>
+    <button onclick="clearSelection()" class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">取消选择</button>
+</div>
+
+<!-- 批量修改状态弹窗 -->
+<div id="batchStatusModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50" onclick="closeBatchStatusModal()"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-[360px]">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">批量修改状态</h3>
+        <select id="batchStatusSelect" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none mb-4">
+            <option value="已正常营业">已正常营业</option>
+            <option value="筹建审批中">筹建审批中</option>
+            <option value="已排除">已排除</option>
+            <option value="已注销">已注销</option>
+        </select>
+        <div class="flex gap-3">
+            <button onclick="closeBatchStatusModal()" class="flex-1 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-colors">取消</button>
+            <button onclick="batchChangeStatus()" class="flex-1 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded-lg transition-colors">确定</button>
+        </div>
+    </div>
+</div>
+
+<!-- 数据表格 -->
+<div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="bg-gray-50 dark:bg-gray-700 text-left text-gray-600 dark:text-gray-300">
+                    <th class="px-4 py-3 font-medium w-10"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="rounded"></th>
+                    <th class="px-4 py-3 font-medium hidden">ID</th>
+                    <th class="px-4 py-3 font-medium">企业名称</th>
+                    <th class="px-4 py-3 font-medium">区域</th>
+                    <th class="px-4 py-3 font-medium">法人</th>
+                    <th class="px-4 py-3 font-medium">电话</th>
+                    <th class="px-4 py-3 font-medium">资本</th>
+                    <th class="px-4 py-3 font-medium">成立日期</th>
+                    <th class="px-4 py-3 font-medium">状态</th>
+                    <th class="px-4 py-3 font-medium">操作</th>
+                </tr>
+            </thead>
+            <tbody id="recordsTable" class="divide-y divide-gray-100 dark:divide-gray-700">
+                {% for record in records %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors" data-id="{{ record.id }}">
+                    <td class="px-4 py-3"><input type="checkbox" class="record-checkbox rounded" data-id="{{ record.id }}" onchange="updateBatchBar()"></td>
+                    <td class="px-4 py-3 text-gray-500 dark:text-gray-400 hidden">{{ record.id }}</td>
+                    <td class="px-4 py-3">
+                        <a href="https://www.tianyancha.com/search?key={{ record.name }}" target="_blank" class="font-medium text-primary-600 dark:text-primary-400 hover:underline">{{ record.name }}</a>
+                        <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ record.address[:30] if record.address else '' }}{% if record.address and record.address|length > 30 %}...{% endif %}</div>
+                    </td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ record.area.split('-')[-1] if '-' in record.area else record.area }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ record.legal_person or '—' }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ record.phone or '—' }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ record.registered_capital or '—' }}</td>
+                    <td class="px-4 py-3 text-gray-600 dark:text-gray-400">{{ record.establish_date or '—' }}</td>
+                    <td class="px-4 py-3">
+                        {% if record.status == '筹建审批中' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 pulse-badge">{{ record.status }}</span>
+                        {% elif record.status == '已排除' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 line-through">{{ record.status }}</span>
+                        {% else %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">{{ record.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-1">
+                            <button onclick="viewRecord('{{ record.id }}')" class="p-1.5 text-gray-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded transition-colors" title="查看详情">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            </button>
+                            <button onclick="editRecord('{{ record.id }}')" class="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors" title="编辑">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            </button>
+                            <button onclick="deleteRecord('{{ record.id }}')" class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" title="删除">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
+                            <button onclick="excludeRecord('{{ record.id }}')" class="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors" title="排除">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 查看详情模态框 -->
+<div id="viewModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50" onclick="closeViewModal()"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-[500px] max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">企业详情</h3>
+            <button onclick="closeViewModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl">&times;</button>
+        </div>
+        <div class="p-4" id="viewModalBody"></div>
+    </div>
+</div>
+
+<!-- 添加企业模态框 -->
+<div class="modal fade" id="addModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl">
+            <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-blue-500 rounded-t-xl">
+                <h5 class="text-lg font-semibold text-white">添加企业</h5>
+                <button type="button" class="text-white/70 hover:text-white text-xl" data-bs-dismiss="modal">&times;</button>
             </div>
-            <div class="modal-body">
-                <form id="editForm">
-                    <input type="hidden" id="editId">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">企业名称 <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="editName" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">区域</label>
-                            <input type="text" class="form-control" id="editArea" placeholder="如: 青海省-玉树州-杂多县">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">地址</label>
-                        <input type="text" class="form-control" id="editAddress">
-                    </div>
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">法人</label>
-                            <input type="text" class="form-control" id="editLegalPerson">
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">注册资本</label>
-                            <input type="text" class="form-control" id="editRegCapital">
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">成立日期</label>
-                            <input type="date" class="form-control" id="editEstablishDate">
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">状态</label>
-                            <select class="form-select" id="editStatus">
-                                <option value="已正常营业">已正常营业</option>
-                                <option value="筹建审批中">筹建审批中</option>
-                                <option value="已注销">已注销</option>
-                                <option value="已排除">已排除</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">来源</label>
-                            <input type="text" class="form-control" id="editSource">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">来源链接</label>
-                        <input type="url" class="form-control" id="editSourceUrl">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">备注</label>
-                        <textarea class="form-control" id="editNotes" rows="2"></textarea>
+            <div class="p-4">
+                <form id="addForm">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">企业名称 <span class="text-red-500">*</span></label>
+                        <input type="text" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none" id="addName" required placeholder="请输入企业名称">
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button class="btn btn-primary" onclick="saveRecord()">💾 保存</button>
+            <div class="flex items-center justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
+                <button type="button" class="px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-colors" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors" onclick="addRecord()">添加</button>
             </div>
-        </div></div>
+        </div>
     </div>
+</div>
 
-    <script src="/static/bootstrap.bundle.min.js"></script>
-    <script src="/static/app.js"></script>
-</body>
-</html>
+<!-- 编辑模态框 -->
+<div id="editModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50" onclick="closeEditModal()"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-[600px] max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-primary-500 rounded-t-2xl">
+            <h3 class="text-lg font-semibold text-white">编辑企业信息</h3>
+            <button onclick="closeEditModal()" class="text-white/70 hover:text-white text-xl">&times;</button>
+        </div>
+        <div class="p-4">
+            <form id="editForm">
+                <input type="hidden" id="editId">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">企业名称 <span class="text-red-500">*</span></label>
+                        <input type="text" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="editName" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">区域</label>
+                        <input type="text" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="editArea">
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">地址</label>
+                    <input type="text" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="editAddress">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">法人</label>
+                        <input type="text" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="editLegal">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">电话</label>
+                        <input type="text" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="editPhone">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">注册资本</label>
+                        <input type="text" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="editCapital">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">状态</label>
+                        <select class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="editStatus">
+                            <option value="已正常营业">已正常营业</option>
+                            <option value="筹建审批中">筹建审批中</option>
+                            <option value="已注销">已注销</option>
+                            <option value="已排除">已排除</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">来源</label>
+                        <input type="text" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="editSource">
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">备注</label>
+                    <textarea class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="editNotes" rows="2"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="flex items-center justify-end gap-2 p-4 border-t border-gray-200 dark:border-gray-700">
+            <button onclick="closeEditModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-700 dark:text-gray-300 text-sm rounded-lg transition-colors">取消</button>
+            <button onclick="saveRecord()" class="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white text-sm rounded-lg transition-colors">保存</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/app.js?v=3.1"></script>
+<script>
+// 页面加载时的初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化完成
+});
+
+// 显示添加企业模态框
+function showAddModal() {
+    // 清空表单
+    document.getElementById('addName').value = '';
+
+    // 显示模态框
+    const modal = new bootstrap.Modal(document.getElementById('addModal'));
+    modal.show();
+}
+
+// 添加企业
+function addRecord() {
+    const name = document.getElementById('addName').value.trim();
+    if (!name) {
+        alert('请输入企业名称');
+        return;
+    }
+
+    const data = {
+        name: name,
+        status: '手动添加',
+        source: '手动添加'
+    };
+
+    fetch('/api/records', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast('添加成功', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addModal'));
+            if (modal) modal.hide();
+            location.reload();
+        } else {
+            showToast('添加失败: ' + (res.error || '未知错误'), 'error');
+        }
+    })
+    .catch(err => showToast('网络错误: ' + err.message, 'error'));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}管理面板 - {{ system_config.web.title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/" class="text-gray-500 hover:text-primary-500 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        </a>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">管理面板</h1>
+    </div>
+
+    <!-- 邀请码管理 -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 mb-5">
+        <h2 class="text-lg font-semibold text-primary-600 dark:text-primary-400 mb-4">邀请码管理</h2>
+        <div class="flex items-center gap-3 mb-4">
+            <button onclick="generateCode()" id="genBtn" class="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white text-sm rounded-lg transition-colors">生成邀请码</button>
+            <span id="newCode" class="text-sm text-green-600 dark:text-green-400 hidden"></span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-200 dark:border-gray-600">
+                        <th class="text-left py-2 px-3 text-gray-500 dark:text-gray-400">邀请码</th>
+                        <th class="text-left py-2 px-3 text-gray-500 dark:text-gray-400">已使用/总量</th>
+                        <th class="text-left py-2 px-3 text-gray-500 dark:text-gray-400">创建时间</th>
+                        <th class="text-right py-2 px-3 text-gray-500 dark:text-gray-400">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="codeList"></tbody>
+            </table>
+            <div id="noCodes" class="text-center py-4 text-gray-400 text-sm hidden">暂无邀请码</div>
+        </div>
+    </div>
+
+    <!-- 用户列表 -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+        <h2 class="text-lg font-semibold text-primary-600 dark:text-primary-400 mb-4">用户列表</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-200 dark:border-gray-600">
+                        <th class="text-left py-2 px-3 text-gray-500 dark:text-gray-400">用户名</th>
+                        <th class="text-left py-2 px-3 text-gray-500 dark:text-gray-400">角色</th>
+                        <th class="text-left py-2 px-3 text-gray-500 dark:text-gray-400">注册时间</th>
+                    </tr>
+                </thead>
+                <tbody id="userList"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+function loadCodes() {
+    fetch('/api/admin/invite-codes').then(r => r.json()).then(codes => {
+        const tbody = document.getElementById('codeList');
+        const noCodes = document.getElementById('noCodes');
+        if (!codes.length) {
+            tbody.innerHTML = '';
+            noCodes.classList.remove('hidden');
+            return;
+        }
+        noCodes.classList.add('hidden');
+        tbody.innerHTML = codes.map(c => `
+            <tr class="border-b border-gray-100 dark:border-gray-700">
+                <td class="py-2 px-3 font-mono text-primary-600 dark:text-primary-400">${c.code}</td>
+                <td class="py-2 px-3 text-gray-600 dark:text-gray-400">${c.used} / ${c.max_uses}</td>
+                <td class="py-2 px-3 text-gray-500 dark:text-gray-400">${c.created_at}</td>
+                <td class="py-2 px-3 text-right">
+                    <button onclick="deleteCode('${c.code}')" class="text-red-500 hover:text-red-600 text-xs">删除</button>
+                </td>
+            </tr>
+        `).join('');
+    });
+}
+
+function loadUsers() {
+    fetch('/api/admin/users').then(r => r.json()).then(users => {
+        document.getElementById('userList').innerHTML = users.map(u => `
+            <tr class="border-b border-gray-100 dark:border-gray-700">
+                <td class="py-2 px-3 font-medium text-gray-800 dark:text-gray-200">${u.username}</td>
+                <td class="py-2 px-3">
+                    <span class="px-2 py-0.5 text-xs rounded-full ${u.role === 'admin' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}">${u.role === 'admin' ? '管理员' : '用户'}</span>
+                </td>
+                <td class="py-2 px-3 text-gray-500 dark:text-gray-400">${u.created_at}</td>
+            </tr>
+        `).join('');
+    });
+}
+
+function generateCode() {
+    const btn = document.getElementById('genBtn');
+    btn.disabled = true;
+    fetch('/api/admin/invite-codes', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({max_uses: 10})})
+        .then(r => r.json()).then(data => {
+            if (data.success) {
+                const span = document.getElementById('newCode');
+                span.textContent = '已生成: ' + data.code;
+                span.classList.remove('hidden');
+                loadCodes();
+            }
+        }).finally(() => { btn.disabled = false; });
+}
+
+function deleteCode(code) {
+    if (!confirm('确定删除邀请码 ' + code + ' ?')) return;
+    fetch('/api/admin/invite-codes', {method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code: code})})
+        .then(() => loadCodes());
+}
+
+loadCodes();
+loadUsers();
+</script>
+{% endblock %}

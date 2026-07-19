@@ -4,41 +4,25 @@
 
 ## 功能
 
-- 🔍 自动监控企业注册信息
-- 🌍 支持多地区监控
-- 📊 Web界面管理
-- 📈 数据可视化
-- ⏰ 定时任务
+- 多数据源支持（天眼查、企查查）
+- 自动监控企业注册信息
+- 支持全国所有省市区县
+- Tailwind CSS 现代化Web界面
+- 深色模式
+- JSON数据导出
+- 多地区、多关键词筛选
+- 排除关键词过滤
 
 ## 快速开始
 
 ### 环境要求
 
-- Python 3.7+
-- Flask
-- Requests
+- Python 3.9+
 
 ### 安装
 
 ```bash
 pip install -r requirements.txt
-```
-
-### 配置
-
-在 `config.json` 中配置：
-
-```json
-{
-  "tianyancha": {
-    "api_key": "你的API密钥"
-  },
-  "monitor": {
-    "regions": ["四川省-南充市-顺庆区"],
-    "keywords": ["网吧", "网咖"],
-    "time_range": 1
-  }
-}
 ```
 
 ### 运行
@@ -49,9 +33,18 @@ python web_app.py
 
 访问 http://localhost:8080
 
-## 监控
+### 配置
 
-运行监控脚本：
+首次运行后访问 http://localhost:8080/settings 进行配置：
+
+1. 选择监控地区（省-市-区三级联动选择）
+2. 配置搜索关键词（默认：网吧、网咖、电竞）
+3. 配置数据源API Key（天眼查/企查查）
+4. 保存配置
+
+### 监控
+
+在Web界面点击"开始监控"，或直接运行：
 
 ```bash
 python tianyancha_monitor.py
@@ -63,56 +56,41 @@ python tianyancha_monitor.py
 ├── web_app.py              # Flask Web应用
 ├── tianyancha_monitor.py   # 监控脚本
 ├── config_manager.py       # 配置管理
+├── data_sources.py         # 数据源抽象层（天眼查/企查查）
+├── region_map.py           # 地区映射数据
 ├── requirements.txt        # 依赖
-├── config.json            # 配置文件
-├── database.json          # 数据库
-├── templates/             # HTML模板
-├── static/                # 静态资源
-└── README.md              # 说明文档
+├── config.json             # 配置文件（自动生成）
+├── database.json           # 数据库（自动生成）
+├── templates/              # HTML模板
+│   ├── base.html           # 共享布局
+│   ├── index.html          # 数据列表页
+│   ├── settings.html       # 设置页
+│   └── monitor.html        # 监控页
+├── static/                 # 静态资源
+│   ├── app.js              # 前端逻辑
+│   └── region-data.js      # 行政区划数据
+└── README.md
 ```
 
-## 待解决问题
+## 数据源
 
-### 当前问题：API不返回地址信息
+### 天眼查
 
-**现象**：
-- 搜索API返回的企业列表不包含 `regLocation` 字段
-- 无法准确判断企业是否在监控地区内
-- "南充市微米网咖"能被搜到，但无法确定地址
+1. 访问 https://open.tianyancha.com/ 获取API Key
+2. 在设置页面配置API Key
 
-**测试结果**：
-```python
-# 搜索"南充市微米网咖"
-返回：
-{
-  "name": "南充市微米网咖（个人独资）",
-  "estiblishTime": "2026-04-14",
-  "legalPersonName": "夏小银",
-  "regLocation": ""  # 空！
-}
+### 企查查
 
-# 搜索"网吧"
-返回10条企业，所有企业的 regLocation 都为空
-```
+1. 获取企查查MCP API Key（Bearer Token）
+2. 在设置页面配置API Key并启用
+3. API地址默认为: `https://agent.qcc.com/mcp/company/stream`
 
-**需要解决的问题**：
-1. 天眼查搜索API是否需要其他参数才能返回地址？
-2. 是否需要调用其他API获取企业详情？
-3. 是否有其他方式获取企业地址？
+## 技术栈
 
-### 已知限制
-
-- API搜索结果不包含地址信息
-- 企业详情API工具名未知（`get_company_detail` 返回错误）
-- 目前只能从企业名称推断地区（不够准确）
-
-### 期望解决方案
-
-欢迎提PR解决以下问题：
-
-1. 查找正确的企业详情API
-2. 优化地区提取逻辑
-3. 添加其他数据源（企查查等）
+- 后端：Flask 3.0
+- 前端：Tailwind CSS (CDN) + 原生JavaScript
+- 数据存储：JSON文件
+- Python依赖：Flask, Requests, openpyxl
 
 ## License
 

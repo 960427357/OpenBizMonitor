@@ -1,404 +1,674 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>设置 - 网吧监控系统</title>
-    <link href="/static/bootstrap.min.css" rel="stylesheet">
-    <link href="/static/bootstrap-icons.css" rel="stylesheet">
-    <style>
-        body {background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px;}
-        .container {background: white; border-radius: 20px; padding: 30px; max-width: 1000px; margin: 0 auto;}
-        .form-section {border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; margin-bottom: 20px;}
-        .section-title {font-size: 1.2rem; font-weight: 600; color: #6366f1; margin-bottom: 15px;}
-        
-        .region-selector {border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;}
-        .region-panels {display: flex; height: 400px;}
-        .region-panel {flex: 1; border-right: 1px solid #e5e7eb; overflow-y: auto; background: #f9fafb;}
-        .region-panel:last-child {border-right: none;}
-        .region-panel-header {padding: 12px 15px; background: #6366f1; color: white; font-weight: 600; position: sticky; top: 0; z-index: 10;}
-        .region-list {list-style: none; padding: 5px 0; margin: 0;}
-        .region-item {padding: 8px 15px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px;}
-        .region-item:hover {background: #e0e7ff;}
-        .region-item.active {background: #c7d2fe; font-weight: 600;}
-        .region-item input[type="checkbox"] {width: 16px; height: 16px; cursor: pointer; accent-color: #6366f1;}
-        .region-placeholder {padding: 12px 15px; color: #6b7280; font-size: 0.9rem; text-align: center;}
-        
-        .selected-regions {display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;}
-        .region-tag {background: #e0e7ff; color: #4f46e5; padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; display: flex; align-items: center; gap: 5px;}
-        .region-tag button {background: none; border: none; cursor: pointer; color: #6366f1; font-size: 1rem; padding: 0; line-height: 1;}
-        .region-tag button:hover {color: #dc2626;}
-        .region-actions {display: flex; gap: 10px; margin-bottom: 10px;}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h3 class="mb-4">⚙️ 系统设置</h3>
-        <a href="/" class="btn btn-outline-secondary mb-3">← 返回</a>
+{% extends "base.html" %}
+{% block title %}设置 - {{ system_config.web.title }}{% endblock %}
 
-        <div class="form-section">
-            <div class="section-title">🎯 监控地区选择</div>
-            <p class="text-muted mb-3">点击省份 → 选择城市 → 选择区县，勾选框可多选</p>
-            
-            <div class="region-selector">
-                <div class="region-panels">
-                    <div class="region-panel">
-                        <div class="region-panel-header">省/自治区/直辖市</div>
-                        <ul class="region-list" id="provinceList"></ul>
-                    </div>
-                    <div class="region-panel">
-                        <div class="region-panel-header" id="cityHeader">请先选择省份</div>
-                        <div class="region-placeholder" id="cityPlaceholder">← 点击左侧省份</div>
-                        <ul class="region-list" id="cityList" style="display:none;"></ul>
-                    </div>
-                    <div class="region-panel">
-                        <div class="region-panel-header" id="countyHeader">请先选择城市</div>
-                        <div class="region-placeholder" id="countyPlaceholder">← 点击中间城市</div>
-                        <ul class="region-list" id="countyList" style="display:none;"></ul>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="mt-3">
-                <label class="form-label"><strong>已选地区：</strong><span class="text-muted" id="selectedCount">0个</span></label>
-                <div class="region-actions">
-                    <button class="btn btn-sm btn-outline-danger" onclick="clearAllRegions()">清空所有</button>
-                </div>
-                <div class="selected-regions" id="selectedRegions"></div>
-            </div>
-        </div>
-
-        <div class="form-section">
-            <div class="section-title">🔍 搜索配置</div>
-            <div class="mb-3">
-                <label class="form-label">搜索关键词（逗号分隔）</label>
-                <input type="text" class="form-control" id="keywords" value="网吧, 网咖, 电竞">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">排除关键词（逗号分隔）</label>
-                <input type="text" class="form-control" id="exclude_keywords" value="">
-                <small class="text-muted">包含这些关键词的企业会被自动跳过</small>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">搜索时间范围</label>
-                <select class="form-select" id="searchTimeRange">
-                    <option value="1">最近1年（推荐）</option>
-                    <option value="2">最近2年</option>
-                    <option value="3">最近3年</option>
-                    <option value="5">最近5年</option>
-                    <option value="0">不限时间</option>
-                </select>
-                <small class="text-muted">超过此时限的企业不显示</small>
-            </div>
-        </div>
-
-        <div class="form-section">
-            <div class="section-title">🔑 天眼查API</div>
-            <div class="mb-3">
-                <label class="form-label">API Key <span class="text-danger">*</span></label>
-                <input type="password" class="form-control" id="api_key" value="">
-                <small class="text-muted"><a href="https://open.tianyancha.com/" target="_blank">点击获取API Key</a></small>
-            </div>
-        </div>
-
-        <div class="form-section">
-            <div class="section-title">⚙️ 系统配置</div>
-            <div class="mb-3">
-                <label class="form-label">Web端口</label>
-                <input type="number" class="form-control" id="port" value="8080">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">系统标题</label>
-                <input type="text" class="form-control" id="title" value="网吧监控系统">
-            </div>
-        </div>
-
-        <button class="btn btn-primary btn-lg w-100" onclick="saveConfig()">💾 保存配置</button>
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/" class="text-gray-500 hover:text-primary-500 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        </a>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">系统设置</h1>
     </div>
 
-    <script src="/static/region-data.js"></script>
-    <script>
-    let selectedRegions = [];
-    let currentProvince = null;
-    let currentCity = null;
+    <!-- 监控地区选择 -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 mb-5">
+        <h2 class="text-lg font-semibold text-primary-600 dark:text-primary-400 mb-2">监控地区选择</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">点击省份 → 选择城市 → 选择区县，勾选框可多选</p>
 
-    function init() {
-        renderProvinces();
-        loadConfig();
+        <div class="border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+            <div class="flex h-80">
+                <!-- 省份 -->
+                <div class="flex-1 border-r border-gray-200 dark:border-gray-600 overflow-y-auto bg-gray-50 dark:bg-gray-750">
+                    <div class="sticky top-0 z-10 px-3 py-2 bg-primary-500 text-white text-sm font-semibold">省/自治区/直辖市</div>
+                    <ul class="py-1" id="provinceList"></ul>
+                </div>
+                <!-- 城市 -->
+                <div class="flex-1 border-r border-gray-200 dark:border-gray-600 overflow-y-auto bg-gray-50 dark:bg-gray-750">
+                    <div class="sticky top-0 z-10 px-3 py-2 bg-primary-500 text-white text-sm font-semibold" id="cityHeader">请先选择省份</div>
+                    <div class="px-3 py-4 text-center text-sm text-gray-400" id="cityPlaceholder">← 点击左侧省份</div>
+                    <ul class="py-1" id="cityList" style="display:none;"></ul>
+                </div>
+                <!-- 区县 -->
+                <div class="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-750">
+                    <div class="sticky top-0 z-10 px-3 py-2 bg-primary-500 text-white text-sm font-semibold" id="countyHeader">请先选择城市</div>
+                    <div class="px-3 py-4 text-center text-sm text-gray-400" id="countyPlaceholder">← 点击中间城市</div>
+                    <ul class="py-1" id="countyList" style="display:none;"></ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">已选地区：<span id="selectedCount" class="text-primary-500">0个</span></span>
+                <button onclick="clearAllRegions()" class="text-xs text-red-500 hover:text-red-600 transition-colors">清空所有</button>
+            </div>
+            <div class="flex flex-wrap gap-2" id="selectedRegions"></div>
+        </div>
+    </div>
+
+    <!-- 搜索配置 -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 mb-5">
+        <h2 class="text-lg font-semibold text-primary-600 dark:text-primary-400 mb-4">搜索配置</h2>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">搜索关键词（逗号分隔）</label>
+                <input type="text" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="keywords" value="网吧, 网咖, 电竞">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">排除关键词（逗号分隔）</label>
+                <input type="text" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="exclude_keywords" value="">
+                <p class="text-xs text-gray-400 mt-1">包含这些关键词的企业会被自动跳过</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">搜索时间范围</label>
+                <select class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="searchTimeRange">
+                    <option value="0.25">最近3个月</option>
+                    <option value="0.5">最近半年</option>
+                    <option value="1">最近1年（推荐）</option>
+                    <option value="3">最近1~3年</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- 数据源配置 -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 mb-5">
+        <h2 class="text-lg font-semibold text-primary-600 dark:text-primary-400 mb-4">数据源配置</h2>
+
+        <div class="space-y-5">
+            <!-- 天眼查网页爬虫（优先） -->
+            <div class="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-medium text-green-800 dark:text-green-200">天眼查网页爬虫（推荐）</h3>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="ty_web_active" class="w-4 h-4 rounded accent-green-500" checked>
+                        <span class="text-sm text-green-600 dark:text-green-400">启用</span>
+                    </label>
+                </div>
+                <div class="space-y-3">
+                    <p class="text-sm text-green-700 dark:text-green-300">使用 Playwright 无头浏览器自动爬取，支持精确地区和时间筛选，无需API Key。首次使用需扫码登录一次，后续完全后台运行。</p>
+
+                    <!-- 浏览器状态检测 -->
+                    <div class="flex items-center gap-3 p-3 bg-white dark:bg-gray-700 rounded-lg border border-green-200 dark:border-green-600">
+                        <div class="flex-shrink-0">
+                            <span id="browser_status_icon" class="text-gray-400">⏳</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Playwright 浏览器状态</div>
+                            <div id="browser_status_text" class="text-xs text-gray-500 dark:text-gray-400">未检测</div>
+                        </div>
+                        <button onclick="checkBrowser()" class="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs rounded-lg transition-colors">检测</button>
+                    </div>
+
+                    <!-- 登录状态 -->
+                    <div class="flex items-center gap-3 p-3 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <div class="flex-shrink-0">
+                            <span id="login_status_icon" class="text-gray-400">⏳</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">天眼查登录状态</div>
+                            <div id="login_status_text" class="text-xs text-gray-500 dark:text-gray-400">未检测</div>
+                        </div>
+                        <button onclick="checkTianyanChaLogin()" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg transition-colors">检测登录</button>
+                    </div>
+
+                    <!-- 登录按钮 -->
+                    <div class="flex items-center gap-3 p-3 bg-white dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <div class="flex-shrink-0">
+                            <span class="text-blue-500">🔐</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">登录天眼查</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">首次使用需扫码登录，登录后自动保存状态</div>
+                        </div>
+                        <button onclick="tianyanchaLogin()" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg transition-colors">登录</button>
+                    </div>
+
+                    <!-- 使用说明 -->
+                    <div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-700">
+                        <div class="flex items-start gap-2">
+                            <span class="text-yellow-600 dark:text-yellow-400 mt-0.5">💡</span>
+                            <div class="text-xs text-yellow-700 dark:text-yellow-300">
+                                <p class="font-medium mb-1">使用步骤：</p>
+                                <ol class="list-decimal list-inside space-y-1">
+                                    <li>确保已安装 Playwright（运行 <code class="bg-yellow-100 dark:bg-yellow-800 px-1 rounded">pip install playwright && playwright install chromium</code>）</li>
+                                    <li>点击"检测"确认浏览器可用</li>
+                                    <li>点击"登录"按钮，在弹出的二维码中扫码登录</li>
+                                    <li>登录成功后，后续运行完全后台，无需再次登录</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 天眼查 MCP API -->
+            <div class="p-4 bg-gray-50 dark:bg-gray-750 rounded-lg border border-gray-200 dark:border-gray-600">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-medium text-gray-800 dark:text-gray-200">天眼查 MCP API（可选）</h3>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="ty_active" class="w-4 h-4 rounded accent-primary-500">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">启用</span>
+                    </label>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">API Key</label>
+                        <input type="password" class="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="api_key" value="">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">API URL</label>
+                        <input type="text" class="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="ty_api_url" value="https://mcp.tianyancha.com/v1">
+                    </div>
+                    <p class="text-xs text-gray-400"><a href="https://open.tianyancha.com/" target="_blank" class="text-primary-500 hover:underline">获取API Key →</a></p>
+                </div>
+            </div>
+
+            <!-- 企查查 MCP API -->
+            <div class="p-4 bg-gray-50 dark:bg-gray-750 rounded-lg border border-gray-200 dark:border-gray-600">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-medium text-gray-800 dark:text-gray-200">企查查 MCP API（可选）</h3>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="qc_active" class="w-4 h-4 rounded accent-primary-500">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">启用</span>
+                    </label>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">API Key</label>
+                        <input type="password" class="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="qc_api_key" value="">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 dark:text-gray-400 mb-1">API URL</label>
+                        <input type="text" class="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="qc_api_url" value="https://agent.qcc.com/mcp/company/stream">
+                    </div>
+                    <p class="text-xs text-gray-400"><a href="https://open.qcc.com/" target="_blank" class="text-primary-500 hover:underline">获取API Key →</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 系统配置 -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 mb-5">
+        <h2 class="text-lg font-semibold text-primary-600 dark:text-primary-400 mb-4">系统配置</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Web端口</label>
+                <input type="number" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="port" value="8080">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">系统标题</label>
+                <input type="text" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 outline-none" id="title" value="网吧监控系统">
+            </div>
+        </div>
+    </div>
+
+    <!-- 保存按钮 -->
+    <button onclick="saveConfig()" class="w-full py-3 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-xl transition-colors shadow-sm">保存配置</button>
+</div>
+
+<!-- 二维码登录弹窗 -->
+<div id="qrLoginModal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50" onclick="closeQrLogin()"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 w-[360px]">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-200">扫码登录天眼查</h3>
+            <button onclick="closeQrLogin()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl">&times;</button>
+        </div>
+        <div id="qrImageContainer" class="flex items-center justify-center h-64 bg-gray-100 dark:bg-gray-700 rounded-lg mb-4">
+            <div id="qrLoading" class="text-gray-400">加载中...</div>
+            <img id="qrImage" class="hidden max-w-full max-h-full" alt="QR Code">
+        </div>
+        <div id="qrStatusText" class="text-center text-sm text-gray-500 dark:text-gray-400 mb-3">请使用天眼查APP扫描二维码</div>
+        <div id="qrTimerText" class="text-center text-xs text-gray-400 dark:text-gray-500"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/region-data.js"></script>
+<script>
+let selectedRegions = [];
+let currentProvince = null;
+let currentCity = null;
+
+function init() {
+    renderProvinces();
+    loadConfig();
+    // 自动检测天眼查登录状态（读取已保存的cookie）
+    checkTianyanChaLogin();
+}
+
+function renderProvinces() {
+    const list = document.getElementById('provinceList');
+    list.innerHTML = '';
+    for (const province in regionData) {
+        const li = document.createElement('li');
+        li.className = 'flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors text-sm';
+        li.innerHTML = '<input type="checkbox" onchange="toggleProvince(this, \'' + province + '\')" class="w-4 h-4 rounded accent-primary-500"><span onclick="selectProvince(\'' + province + '\', this.parentElement)">' + province + '</span>';
+        list.appendChild(li);
     }
+}
 
-    // 渲染省份列表（带复选框）
-    function renderProvinces() {
-        const list = document.getElementById('provinceList');
-        list.innerHTML = '';
-        for (const province in regionData) {
-            const li = document.createElement('li');
-            li.className = 'region-item';
-            li.innerHTML = '<input type="checkbox" onchange="toggleProvince(this, \'' + province + '\')"><span onclick="selectProvince(\'' + province + '\', this.parentElement)">' + province + '</span>';
-            list.appendChild(li);
-        }
-    }
-
-    // 省份复选框：全选/取消该省所有市县
-    function toggleProvince(checkbox, province) {
-        const cities = regionData[province];
-        if (checkbox.checked) {
-            // 全选该省所有市县
-            for (const city in cities) {
-                for (const county of cities[city]) {
-                    const regionName = province + '-' + city + '-' + county;
-                    if (!selectedRegions.includes(regionName)) {
-                        selectedRegions.push(regionName);
-                    }
-                }
-            }
-        } else {
-            // 取消该省所有市县
-            selectedRegions = selectedRegions.filter(r => !r.startsWith(province + '-'));
-        }
-        renderSelectedRegions();
-    }
-
-    // 点击省份名称：展开城市列表
-    function selectProvince(province, li) {
-        currentProvince = province;
-        currentCity = null;
-        document.querySelectorAll('#provinceList .region-item').forEach(el => el.classList.remove('active'));
-        li.classList.add('active');
-        
-        const cities = regionData[province];
-        document.getElementById('cityHeader').textContent = province;
-        document.getElementById('cityPlaceholder').style.display = 'none';
-        const cityList = document.getElementById('cityList');
-        cityList.style.display = 'block';
-        cityList.innerHTML = '';
-        
+function toggleProvince(checkbox, province) {
+    const cities = regionData[province];
+    if (checkbox.checked) {
         for (const city in cities) {
-            const li = document.createElement('li');
-            li.className = 'region-item';
-            const isChecked = isCityFullySelected(province, city) ? 'checked' : '';
-            li.innerHTML = '<input type="checkbox" ' + isChecked + ' onchange="toggleCity(this, \'' + province + '\', \'' + city + '\')"><span onclick="selectCity(\'' + province + '\', \'' + city + '\', this.parentElement)">' + city + '</span>';
-            cityList.appendChild(li);
-        }
-        
-        document.getElementById('countyHeader').textContent = '请先选择城市';
-        document.getElementById('countyPlaceholder').style.display = 'block';
-        document.getElementById('countyList').style.display = 'none';
-    }
-
-    // 城市复选框：全选/取消该市所有区县
-    function toggleCity(checkbox, province, city) {
-        const counties = regionData[province][city];
-        if (checkbox.checked) {
-            // 全选该市所有区县
-            for (const county of counties) {
+            for (const county of cities[city]) {
                 const regionName = province + '-' + city + '-' + county;
                 if (!selectedRegions.includes(regionName)) {
                     selectedRegions.push(regionName);
                 }
             }
-        } else {
-            // 取消该市所有区县
-            selectedRegions = selectedRegions.filter(r => r !== province + '-' + city + '-' + r.split('-')[2]);
-            selectedRegions = selectedRegions.filter(r => !(r.startsWith(province + '-' + city + '-')));
         }
-        renderSelectedRegions();
-        // 更新省份复选框状态
-        updateProvinceCheckbox(province);
+    } else {
+        selectedRegions = selectedRegions.filter(r => !r.startsWith(province + '-'));
+    }
+    renderSelectedRegions();
+}
+
+function selectProvince(province, li) {
+    currentProvince = province;
+    currentCity = null;
+    document.querySelectorAll('#provinceList li').forEach(el => el.classList.remove('bg-primary-100', 'dark:bg-primary-900/30'));
+    li.classList.add('bg-primary-100', 'dark:bg-primary-900/30');
+
+    const cities = regionData[province];
+    document.getElementById('cityHeader').textContent = province;
+    document.getElementById('cityPlaceholder').style.display = 'none';
+    const cityList = document.getElementById('cityList');
+    cityList.style.display = 'block';
+    cityList.innerHTML = '';
+
+    for (const city in cities) {
+        const li = document.createElement('li');
+        li.className = 'flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors text-sm';
+        const isChecked = isCityFullySelected(province, city) ? 'checked' : '';
+        li.innerHTML = '<input type="checkbox" ' + isChecked + ' onchange="toggleCity(this, \'' + province + '\', \'' + city + '\')"><span onclick="selectCity(\'' + province + '\', \'' + city + '\', this.parentElement)">' + city + '</span>';
+        cityList.appendChild(li);
     }
 
-    // 点击城市名称：展开区县列表
-    function selectCity(province, city, li) {
-        currentCity = city;
-        document.querySelectorAll('#cityList .region-item').forEach(el => el.classList.remove('active'));
-        li.classList.add('active');
-        
-        const counties = regionData[province][city];
-        document.getElementById('countyHeader').textContent = city;
-        document.getElementById('countyPlaceholder').style.display = 'none';
-        const countyList = document.getElementById('countyList');
-        countyList.style.display = 'block';
-        countyList.innerHTML = '';
-        
+    document.getElementById('countyHeader').textContent = '请先选择城市';
+    document.getElementById('countyPlaceholder').style.display = 'block';
+    document.getElementById('countyList').style.display = 'none';
+}
+
+function toggleCity(checkbox, province, city) {
+    const counties = regionData[province][city];
+    if (checkbox.checked) {
         for (const county of counties) {
-            const li = document.createElement('li');
-            li.className = 'region-item';
             const regionName = province + '-' + city + '-' + county;
-            const isChecked = selectedRegions.includes(regionName) ? 'checked' : '';
-            li.innerHTML = '<input type="checkbox" ' + isChecked + ' onchange="toggleCounty(this, \'' + province + '\', \'' + city + '\', \'' + county + '\')"><span>' + county + '</span>';
-            countyList.appendChild(li);
-        }
-    }
-
-    // 区县复选框：添加/移除单个区县
-    function toggleCounty(checkbox, province, city, county) {
-        const regionName = province + '-' + city + '-' + county;
-        if (checkbox.checked) {
             if (!selectedRegions.includes(regionName)) {
                 selectedRegions.push(regionName);
             }
-        } else {
-            selectedRegions = selectedRegions.filter(r => r !== regionName);
         }
-        renderSelectedRegions();
-        // 更新城市和省份复选框状态
-        updateCityCheckbox(province, city);
-        updateProvinceCheckbox(province);
+    } else {
+        selectedRegions = selectedRegions.filter(r => !(r.startsWith(province + '-' + city + '-')));
     }
+    renderSelectedRegions();
+    updateProvinceCheckbox(province);
+}
 
-    // 判断城市是否全选
-    function isCityFullySelected(province, city) {
-        const counties = regionData[province][city];
-        return counties.every(county => selectedRegions.includes(province + '-' + city + '-' + county));
+function selectCity(province, city, li) {
+    currentCity = city;
+    document.querySelectorAll('#cityList li').forEach(el => el.classList.remove('bg-primary-100', 'dark:bg-primary-900/30'));
+    li.classList.add('bg-primary-100', 'dark:bg-primary-900/30');
+
+    const counties = regionData[province][city];
+    document.getElementById('countyHeader').textContent = city;
+    document.getElementById('countyPlaceholder').style.display = 'none';
+    const countyList = document.getElementById('countyList');
+    countyList.style.display = 'block';
+    countyList.innerHTML = '';
+
+    for (const county of counties) {
+        const li = document.createElement('li');
+        li.className = 'flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors text-sm';
+        const regionName = province + '-' + city + '-' + county;
+        const isChecked = selectedRegions.includes(regionName) ? 'checked' : '';
+        li.innerHTML = '<input type="checkbox" ' + isChecked + ' onchange="toggleCounty(this, \'' + province + '\', \'' + city + '\', \'' + county + '\')"><span>' + county + '</span>';
+        countyList.appendChild(li);
     }
+}
 
-    // 判断省份是否全选
-    function isProvinceFullySelected(province) {
-        const cities = regionData[province];
-        for (const city in cities) {
-            if (!isCityFullySelected(province, city)) return false;
+function toggleCounty(checkbox, province, city, county) {
+    const regionName = province + '-' + city + '-' + county;
+    if (checkbox.checked) {
+        if (!selectedRegions.includes(regionName)) {
+            selectedRegions.push(regionName);
         }
-        return true;
+    } else {
+        selectedRegions = selectedRegions.filter(r => r !== regionName);
     }
+    renderSelectedRegions();
+    updateCityCheckbox(province, city);
+    updateProvinceCheckbox(province);
+}
 
-    // 更新城市复选框状态
-    function updateCityCheckbox(province, city) {
-        const cityList = document.getElementById('cityList');
-        const items = cityList.querySelectorAll('.region-item');
-        items.forEach(item => {
-            const span = item.querySelector('span');
-            if (span && span.textContent === city) {
-                const cb = item.querySelector('input[type="checkbox"]');
-                cb.checked = isCityFullySelected(province, city);
-            }
-        });
+function isCityFullySelected(province, city) {
+    const counties = regionData[province][city];
+    return counties.every(county => selectedRegions.includes(province + '-' + city + '-' + county));
+}
+
+function isProvinceFullySelected(province) {
+    const cities = regionData[province];
+    for (const city in cities) {
+        if (!isCityFullySelected(province, city)) return false;
     }
+    return true;
+}
 
-    // 更新省份复选框状态
-    function updateProvinceCheckbox(province) {
-        const provinceList = document.getElementById('provinceList');
-        const items = provinceList.querySelectorAll('.region-item');
-        items.forEach(item => {
-            const span = item.querySelector('span');
-            if (span && span.textContent === province) {
-                const cb = item.querySelector('input[type="checkbox"]');
-                cb.checked = isProvinceFullySelected(province);
-            }
-        });
-    }
-
-    function renderSelectedRegions() {
-        const container = document.getElementById('selectedRegions');
-        container.innerHTML = '';
-        
-        selectedRegions.forEach((region, index) => {
-            const tag = document.createElement('span');
-            tag.className = 'region-tag';
-            tag.innerHTML = region + ' <button onclick="removeRegion(' + index + ')">×</button>';
-            container.appendChild(tag);
-        });
-        
-        document.getElementById('selectedCount').textContent = selectedRegions.length + '个';
-    }
-
-    function removeRegion(index) {
-        const region = selectedRegions[index];
-        selectedRegions.splice(index, 1);
-        renderSelectedRegions();
-        // 更新复选框状态
-        const parts = region.split('-');
-        if (parts.length >= 2) {
-            updateCityCheckbox(parts[0], parts[1]);
-            updateProvinceCheckbox(parts[0]);
+function updateCityCheckbox(province, city) {
+    document.querySelectorAll('#cityList li').forEach(item => {
+        const span = item.querySelector('span');
+        if (span && span.textContent === city) {
+            item.querySelector('input[type="checkbox"]').checked = isCityFullySelected(province, city);
         }
-    }
+    });
+}
 
-    function clearAllRegions() {
-        selectedRegions = [];
-        renderSelectedRegions();
-        // 清除所有复选框
-        document.querySelectorAll('.region-item input[type="checkbox"]').forEach(cb => cb.checked = false);
-    }
+function updateProvinceCheckbox(province) {
+    document.querySelectorAll('#provinceList li').forEach(item => {
+        const span = item.querySelector('span');
+        if (span && span.textContent === province) {
+            item.querySelector('input[type="checkbox"]').checked = isProvinceFullySelected(province);
+        }
+    });
+}
 
-    function loadConfig() {
-        fetch('/api/config')
-            .then(r => r.json())
-            .then(config => {
-                if (config.tianyancha && config.tianyancha.api_key) {
+function renderSelectedRegions() {
+    const container = document.getElementById('selectedRegions');
+    container.innerHTML = '';
+    selectedRegions.forEach((region, index) => {
+        const tag = document.createElement('span');
+        tag.className = 'inline-flex items-center gap-1 px-2.5 py-1 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 text-xs rounded-full';
+        tag.innerHTML = escHtml(region) + ' <button onclick="removeRegion(' + index + ')" class="hover:text-red-500 ml-1">&times;</button>';
+        container.appendChild(tag);
+    });
+    document.getElementById('selectedCount').textContent = selectedRegions.length + '个';
+}
+
+function removeRegion(index) {
+    const region = selectedRegions[index];
+    selectedRegions.splice(index, 1);
+    renderSelectedRegions();
+    const parts = region.split('-');
+    if (parts.length >= 2) {
+        updateCityCheckbox(parts[0], parts[1]);
+        updateProvinceCheckbox(parts[0]);
+    }
+}
+
+function clearAllRegions() {
+    selectedRegions = [];
+    renderSelectedRegions();
+    document.querySelectorAll('.region-item input[type="checkbox"], #provinceList input[type="checkbox"], #cityList input[type="checkbox"], #countyList input[type="checkbox"]').forEach(cb => cb.checked = false);
+}
+
+// 保存原始API Key（用于空值时不覆盖）
+let _origTyKey = '';
+let _origQcKey = '';
+
+function loadConfig() {
+    fetch('/api/config')
+        .then(r => r.json())
+        .then(config => {
+            if (config.tianyancha) {
+                if (config.tianyancha.api_key && config.tianyancha.api_key !== '***') {
                     document.getElementById('api_key').value = config.tianyancha.api_key;
+                    _origTyKey = config.tianyancha.api_key;
+                } else if (config.tianyancha.api_key === '***') {
+                    document.getElementById('api_key').placeholder = '已配置（留空则保持不变，重新输入可修改）';
+                    _origTyKey = '***';
                 }
-                if (config.monitor) {
-                    document.getElementById('keywords').value = (config.monitor.keywords || []).join(', ');
-                    document.getElementById('exclude_keywords').value = (config.monitor.exclude_keywords || []).join(', ');
-                    if (config.monitor.time_range) {
-                        document.getElementById('searchTimeRange').value = config.monitor.time_range;
-                    }
+                if (config.tianyancha.api_url) {
+                    document.getElementById('ty_api_url').value = config.tianyancha.api_url;
                 }
-                if (config.web) {
-                    document.getElementById('port').value = config.web.port || 8080;
-                    document.getElementById('title').value = config.web.title || '网吧监控系统';
+            }
+            if (config.qichacha) {
+                if (config.qichacha.api_key && config.qichacha.api_key !== '***') {
+                    document.getElementById('qc_api_key').value = config.qichacha.api_key;
+                    _origQcKey = config.qichacha.api_key;
+                } else if (config.qichacha.api_key === '***') {
+                    document.getElementById('qc_api_key').placeholder = '已配置（留空则保持不变，重新输入可修改）';
+                    _origQcKey = '***';
                 }
-                if (config.monitor && config.monitor.regions) {
+                if (config.qichacha.api_url) {
+                    document.getElementById('qc_api_url').value = config.qichacha.api_url;
+                }
+            }
+            if (config.datasource) {
+                document.getElementById('ty_web_active').checked = (config.datasource.active || []).includes('tianyancha_web');
+                document.getElementById('ty_active').checked = (config.datasource.active || []).includes('tianyancha');
+                document.getElementById('qc_active').checked = (config.datasource.active || []).includes('qichacha');
+            }
+            if (config.monitor) {
+                document.getElementById('keywords').value = (config.monitor.keywords || []).join(', ');
+                document.getElementById('exclude_keywords').value = (config.monitor.exclude_keywords || []).join(', ');
+                if (config.monitor.time_range !== undefined) {
+                    document.getElementById('searchTimeRange').value = config.monitor.time_range;
+                }
+                if (config.monitor.regions) {
                     selectedRegions = config.monitor.regions;
                     renderSelectedRegions();
-                    // 恢复复选框状态
-                    restoreCheckboxes();
                 }
-            })
-            .catch(e => console.error('加载配置失败:', e));
-    }
-
-    // 恢复复选框状态
-    function restoreCheckboxes() {
-        // 遍历所有省份
-        for (const province in regionData) {
-            if (isProvinceFullySelected(province)) {
-                // 标记省份复选框
-                const provinceList = document.getElementById('provinceList');
-                provinceList.querySelectorAll('.region-item').forEach(item => {
-                    if (item.querySelector('span') && item.querySelector('span').textContent === province) {
-                        item.querySelector('input[type="checkbox"]').checked = true;
-                    }
-                });
             }
+            if (config.web) {
+                document.getElementById('port').value = config.web.port || 8080;
+                document.getElementById('title').value = config.web.title || '网吧监控系统';
+            }
+        })
+        .catch(e => console.error('加载配置失败:', e));
+}
+
+function saveConfig() {
+    const active = [];
+    // 天眼查网页爬虫（默认启用）
+    if (document.getElementById('ty_web_active').checked) active.push('tianyancha_web');
+    // MCP数据源（可选）
+    if (document.getElementById('ty_active').checked) active.push('tianyancha');
+    if (document.getElementById('qc_active').checked) active.push('qichacha');
+
+    // API Key：输入框为空则保持原值，有值则使用新值
+    const tyKeyInput = document.getElementById('api_key').value.trim();
+    const qcKeyInput = document.getElementById('qc_api_key').value.trim();
+
+    const config = {
+        tianyancha: {
+            api_url: document.getElementById('ty_api_url').value,
+            api_key: tyKeyInput || (_origTyKey === '***' ? '' : _origTyKey)
+        },
+        qichacha: {
+            api_url: document.getElementById('qc_api_url').value,
+            api_key: qcKeyInput || (_origQcKey === '***' ? '' : _origQcKey)
+        },
+        datasource: { active: active },
+        monitor: {
+            regions: selectedRegions,
+            keywords: document.getElementById('keywords').value.split(',').map(s => s.trim()).filter(s => s),
+            exclude_keywords: document.getElementById('exclude_keywords').value.split(',').map(s => s.trim()).filter(s => s),
+            time_range: parseInt(document.getElementById('searchTimeRange').value) || 1
+        },
+        web: {
+            port: parseInt(document.getElementById('port').value) || 8080,
+            title: document.getElementById('title').value
         }
-    }
+    };
 
-    function saveConfig() {
-        const config = {
-            tianyancha: {
-                api_url: "https://mcp.tianyancha.com/v1",
-                api_key: document.getElementById('api_key').value
-            },
-            monitor: {
-                regions: selectedRegions,
-                keywords: document.getElementById('keywords').value.split(',').map(s => s.trim()).filter(s => s),
-                exclude_keywords: document.getElementById('exclude_keywords').value.split(',').map(s => s.trim()).filter(s => s),
-                time_range: parseInt(document.getElementById('searchTimeRange').value) || 1
-            },
-            web: {
-                port: parseInt(document.getElementById('port').value) || 8080,
-                title: document.getElementById('title').value
-            }
-        };
+    fetch('/api/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(config)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showToast('配置保存成功！', 'success');
+        } else {
+            showToast('保存失败: ' + (result.message || '未知错误'), 'error');
+        }
+    })
+    .catch(e => showToast('网络错误: ' + e.message, 'error'));
+}
 
-        fetch('/api/config', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(config)
-        })
+init();
+
+// 检测 Playwright 浏览器状态
+function checkBrowser() {
+    const statusIcon = document.getElementById('browser_status_icon');
+    const statusText = document.getElementById('browser_status_text');
+
+    statusIcon.textContent = '⏳';
+    statusText.textContent = '检测中...';
+    statusText.className = 'text-xs text-gray-500 dark:text-gray-400';
+
+    fetch('/api/check-browser')
         .then(r => r.json())
-        .then(result => {
-            if(result.success) {
-                alert('✅ 配置保存成功！\n\n需要重启服务才能生效。');
+        .then(data => {
+            if (data.connected) {
+                statusIcon.textContent = '✅';
+                statusText.textContent = '可用 (' + data.version + ')';
+                statusText.className = 'text-xs text-green-600 dark:text-green-400';
             } else {
-                alert('❌ 保存失败: ' + (result.message || '未知错误'));
+                statusIcon.textContent = '❌';
+                statusText.textContent = '不可用 - ' + (data.error || '请安装 Playwright');
+                statusText.className = 'text-xs text-red-600 dark:text-red-400';
             }
         })
-        .catch(e => alert('❌ 网络错误: ' + e.message));
-    }
+        .catch(e => {
+            statusIcon.textContent = '❌';
+            statusText.textContent = '检测失败: ' + e.message;
+            statusText.className = 'text-xs text-red-600 dark:text-red-400';
+        });
+}
 
-    init();
-    </script>
-</body>
-</html>
+// 检测天眼查登录状态
+function checkTianyanChaLogin() {
+    const statusIcon = document.getElementById('login_status_icon');
+    const statusText = document.getElementById('login_status_text');
+
+    statusIcon.textContent = '⏳';
+    statusText.textContent = '检测中...';
+    statusText.className = 'text-xs text-gray-500 dark:text-gray-400';
+
+    fetch('/api/check-tianyancha-login')
+        .then(r => r.json())
+        .then(data => {
+            if (data.logged_in) {
+                statusIcon.textContent = '✅';
+                statusText.textContent = '已登录 - ' + (data.username || '用户');
+                statusText.className = 'text-xs text-green-600 dark:text-green-400';
+            } else {
+                statusIcon.textContent = '⚠️';
+                statusText.textContent = data.message || data.error || '未登录';
+                statusText.className = 'text-xs text-yellow-600 dark:text-yellow-400';
+            }
+        })
+        .catch(e => {
+            statusIcon.textContent = '❌';
+            statusText.textContent = '检测失败: ' + e.message;
+            statusText.className = 'text-xs text-red-600 dark:text-red-400';
+        });
+}
+
+// 二维码登录天眼查
+let _qrPollTimer = null;
+let _qrStartTime = 0;
+
+function tianyanchaLogin() {
+    const modal = document.getElementById('qrLoginModal');
+    const loading = document.getElementById('qrLoading');
+    const img = document.getElementById('qrImage');
+    const statusText = document.getElementById('qrStatusText');
+    const timerText = document.getElementById('qrTimerText');
+
+    modal.classList.remove('hidden');
+    loading.classList.remove('hidden');
+    loading.textContent = '加载中...';
+    img.classList.add('hidden');
+    statusText.textContent = '正在加载二维码...';
+    timerText.textContent = '';
+
+    fetch('/api/tianyancha-login-start', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.qr_image) {
+                showQrImage(data.qr_image);
+                _qrStartTime = Date.now();
+                startQrPolling();
+            } else {
+                loading.textContent = '❌';
+                loading.classList.remove('hidden');
+                img.classList.add('hidden');
+                statusText.textContent = '加载失败: ' + (data.error || '未知错误');
+            }
+        })
+        .catch(e => {
+            loading.textContent = '❌';
+            loading.classList.remove('hidden');
+            img.classList.add('hidden');
+            statusText.textContent = '网络错误: ' + e.message;
+        });
+}
+
+function showQrImage(base64) {
+    const img = document.getElementById('qrImage');
+    const loading = document.getElementById('qrLoading');
+    img.src = 'data:image/png;base64,' + base64;
+    img.classList.remove('hidden');
+    loading.classList.add('hidden');
+}
+
+function startQrPolling() {
+    stopQrPolling();
+    _qrPollTimer = setInterval(pollQrStatus, 3000);
+}
+
+function stopQrPolling() {
+    if (_qrPollTimer) {
+        clearInterval(_qrPollTimer);
+        _qrPollTimer = null;
+    }
+}
+
+function pollQrStatus() {
+    const elapsed = Math.floor((Date.now() - _qrStartTime) / 1000);
+    const remaining = Math.max(0, 60 - (elapsed % 60));
+    document.getElementById('qrTimerText').textContent = '二维码将在 ' + remaining + ' 秒后刷新';
+
+    fetch('/api/tianyancha-login-qr-status')
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                stopQrPolling();
+                closeQrLogin();
+                showToast('登录成功！', 'success');
+                checkTianyanChaLogin();
+            } else if (data.status === 'waiting' && data.qr_image) {
+                showQrImage(data.qr_image);
+                _qrStartTime = Date.now();
+                document.getElementById('qrStatusText').textContent = '二维码已刷新，请重新扫描';
+            } else if (data.status === 'waiting') {
+                document.getElementById('qrStatusText').textContent = '等待扫码...';
+            } else if (data.status === 'timeout') {
+                stopQrPolling();
+                document.getElementById('qrStatusText').textContent = '登录超时，请重试';
+                document.getElementById('qrTimerText').textContent = '';
+            } else if (data.status === 'error') {
+                stopQrPolling();
+                document.getElementById('qrStatusText').textContent = '出错: ' + (data.error || '未知错误');
+                document.getElementById('qrTimerText').textContent = '';
+            }
+        })
+        .catch(e => {
+            console.error('Poll error:', e);
+        });
+}
+
+function closeQrLogin() {
+    stopQrPolling();
+    document.getElementById('qrLoginModal').classList.add('hidden');
+    fetch('/api/tianyancha-login-cleanup', {method: 'POST'}).catch(() => {});
+}
+</script>
+{% endblock %}
