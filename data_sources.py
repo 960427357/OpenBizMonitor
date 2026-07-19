@@ -112,22 +112,20 @@ class TianyanChaSource(DataSource):
             cutoff = datetime.now() - timedelta(days=time_range * 365)
             estiblish_time_start = cutoff.strftime('%Y-%m-%d')
 
-        # 提取城市名（只取市级，不重复搜索区县）
-        # 例如 "四川省-南充市-顺庆区" -> 只取 "南充"
-        city_names = set()
+        # 提取地区名：优先取区县级，其次取市级
+        # 例如 "四川省-南充市-顺庆区" -> 取 "顺庆"（区县级更精准）
+        # 例如 "南充市" -> 取 "南充"（市级）
+        location_names = set()
         for region in regions:
             parts = region.split('-')
-            # 只取第二级（市级）
-            if len(parts) >= 2:
-                city_part = parts[1]
-            else:
-                city_part = parts[0]
-            clean = city_part.replace('省', '').replace('市', '').replace('区', '').replace('县', '').replace('州', '')
+            # 取最后一级（最具体的区县）
+            location_part = parts[-1] if parts else parts[0]
+            clean = location_part.replace('省', '').replace('市', '').replace('区', '').replace('县', '').replace('州', '')
             if clean and len(clean) >= 2:
-                city_names.add(clean)
+                location_names.add(clean)
 
         # 使用优化的搜索组合策略
-        search_combos = generate_search_combos(keyword, city_names)
+        search_combos = generate_search_combos(keyword, location_names)
         all_results = []
 
         for search_key in search_combos:
