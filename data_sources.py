@@ -106,7 +106,7 @@ class TianyanChaSource(DataSource):
         self.api_key = api_key
         self.api_url = api_url.rstrip('/')
 
-    def search(self, keyword, regions, time_range=1):
+    def search(self, keyword, regions, time_range=1, user_id=None):
         estiblish_time_start = None
         if time_range > 0:
             cutoff = datetime.now() - timedelta(days=time_range * 365)
@@ -188,13 +188,17 @@ class TianyanChaSource(DataSource):
             company_id = str(item.get('id', ''))
             address = item.get('regLocation', '') or ''
 
-            # 尝试通过详情API获取地址
-            if not address.strip() and company_id:
+            # 尝试通过详情API获取地址和电话
+            if (not address.strip() or '电话' not in str(item)) and company_id:
                 detail = self.get_company_detail(company_id)
-                if detail and detail.get('address'):
-                    address = detail['address']
+                if detail:
+                    if detail.get('address'):
+                        address = detail['address']
 
             area = extract_area(address, name)
+
+            # 提取电话号码
+            phone = item.get('phoneNumber', '') or item.get('contactPhone', '') or ''
 
             return {
                 'name': name,
@@ -202,6 +206,7 @@ class TianyanChaSource(DataSource):
                 'registered_capital': item.get('regCapital', ''),
                 'establish_date': (item.get('estiblishTime', '') or '').split(' ')[0],
                 'address': address,
+                'phone': phone,
                 'status': '筹建审批中',
                 'source': self.name,
                 'area': area,
@@ -442,14 +447,16 @@ class QichachaSource(DataSource):
 
 
 def get_active_sources(config: list) -> list:
-    """根据配置返回激活的数据源列表，CLI爬虫优先"""
+    """根据配置返回激活的数据源列表，MCP优先"""
     sources = []
     datasource_config = config.get('datasource', {})
-    active = datasource_config.get('active', ['tianyancha_web'])
+    active = datasource_config.get('active', ['tianyancha', 'tianyancha_web'])
 
-    # 天眼查网页爬虫优先（精确地区筛选）
-    if 'tianyancha_web' in active:
-        sources.append(TianyanChaWebSource())
+    # 天眼查MCP API优先（最可靠，不被反爬）
+    if 'tianyancha' in active:
+        ty = config.get('tianyancha', {})
+        if ty.get('api_key'):
+            sources.append(TianyanChaSource(ty['api_key'], ty.get('api_url', '')))
 
     # 企查查MCP（如果启用）
     if 'qichacha' in active:
@@ -457,11 +464,9 @@ def get_active_sources(config: list) -> list:
         if qc.get('api_key'):
             sources.append(QichachaSource(qc['api_key'], qc.get('api_url', '')))
 
-    # 天眼查MCP（如果启用）
-    if 'tianyancha' in active:
-        ty = config.get('tianyancha', {})
-        if ty.get('api_key'):
-            sources.append(TianyanChaSource(ty['api_key'], ty.get('api_url', '')))
+    # 天眼查网页爬虫作为备用（可能被反爬）
+    if 'tianyancha_web' in active:
+        sources.append(TianyanChaWebSource())
 
     return sources
 

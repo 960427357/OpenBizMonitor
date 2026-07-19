@@ -42,7 +42,7 @@ class ConfigManager:
                 "api_key": ""
             },
             "datasource": {
-                "active": ["tianyancha_web"]
+                "active": ["tianyancha", "tianyancha_web"]
             },
             "monitor": {
                 "regions": [],
