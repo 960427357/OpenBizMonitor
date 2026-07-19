@@ -220,12 +220,18 @@ class TianyanChaSource(DataSource):
             company_id = str(item.get('id', ''))
             address = item.get('regLocation', '') or ''
 
-            # 尝试通过详情API获取地址和电话
-            if (not address.strip() or '电话' not in str(item)) and company_id:
-                detail = self.get_company_detail(company_id)
-                if detail:
-                    if detail.get('address'):
-                        address = detail['address']
+            area = extract_area(address, name)
+            # 如果区域未知，从企业名称中提取
+            if area == '未知' and name:
+                import re
+                # 匹配 "XX市XX区" 或 "XX区" 或 "XX县" 格式
+                area_match = re.search(r'([\u4e00-\u9fa5]+(?:市|区|县|州|旗))([\u4e00-\u9fa5]+(?:区|县|州|旗))', name)
+                if area_match:
+                    area = area_match.group(1) + area_match.group(2)
+                else:
+                    area_match = re.search(r'([\u4e00-\u9fa5]+(?:区|县|州|旗))', name)
+                    if area_match:
+                        area = area_match.group(1)
 
             area = extract_area(address, name)
 
